@@ -189,88 +189,130 @@ app.get('/share/:code', (req, res) => {
 const pureimage = require('pureimage');
 const { PassThrough } = require('stream');
 
-// Pre-cargar fuentes al iniciar el servidor
-let fntBold = null, fntReg = null;
+const FONT_PATHS = [
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'OGBold'],
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'OGReg'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 'OGBold'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 'OGReg'],
+];
+
+let ogFontsLoaded = false;
 (async () => {
-  try {
-    fntBold = pureimage.registerFont('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'OGBold');
-    fntReg  = pureimage.registerFont('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'OGReg');
-    await fntBold.load();
-    await fntReg.load();
-    console.log('Fuentes OG cargadas OK');
-  } catch(e) { console.log('Fuentes OG no disponibles:', e.message); }
+  for (const [p, name] of FONT_PATHS) {
+    if (ogFontsLoaded) break;
+    try {
+      if (fs.existsSync(p)) {
+        const f = pureimage.registerFont(p, name);
+        await f.load();
+        ogFontsLoaded = true;
+        console.log('Fuente OG cargada:', p);
+      }
+    } catch(e) {}
+  }
+  if (!ogFontsLoaded) console.log('Usando fuente fallback para OG images');
 })();
 
-const OG_STEP_LABELS = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
-const OG_STEP_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
+const OG_STEPS  = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
+const OG_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
+const ogCache   = new Map();
 
-const ogCache = new Map();
+function fillRect(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
+}
 
 app.get('/og-image/:code', async (req, res) => {
   const code = req.params.code;
-
-  // Cache 60 segundos
   if (ogCache.has(code)) {
     const { buf, ts } = ogCache.get(code);
     if (Date.now() - ts < 60000) {
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=60');
+      res.setHeader('Content-Type','image/png');
+      res.setHeader('Cache-Control','public, max-age=60');
       return res.send(buf);
     }
   }
 
-  const s = Object.values(db.shipments).find(x => x.tracking === code);
-  const product  = s ? (s.product.length > 40 ? s.product.substring(0,40)+'…' : s.product) : 'Tu pedido';
-  const step     = s ? (OG_STEP_LABELS[s.currentStep] || 'En proceso') : 'Seguimiento en vivo';
-  const stepColor= s ? (OG_STEP_COLORS[s.currentStep] || '#FF5A36') : '#FF5A36';
-  const recipient= s ? s.recipient : '';
-  const dest     = s && s.destName ? s.destName.split(',')[0] : '';
+  const s          = Object.values(db.shipments).find(x => x.tracking === code);
+  const product    = s ? (s.product.length>38 ? s.product.substring(0,38)+'…' : s.product) : 'Tu pedido';
+  const step       = s ? (OG_STEPS[s.currentStep]  || 'En proceso')   : 'Seguimiento en vivo';
+  const stepColor  = s ? (OG_COLORS[s.currentStep] || '#FF5A36')       : '#FF5A36';
+  const recipient  = s ? s.recipient : '';
+  const dest       = s && s.destName ? s.destName.split(',')[0] : '';
+  const bold       = ogFontsLoaded ? 'bold 1px "OGBold"' : 'bold 1px sans-serif';
+  const reg        = ogFontsLoaded ? '1px "OGReg"'       : '1px sans-serif';
 
   try {
-    const img = pureimage.make(1200, 630);
+    const W = 1200, H = 630;
+    const img = pureimage.make(W, H);
     const ctx = img.getContext('2d');
 
-    // Background
-    ctx.fillStyle = '#15182B'; ctx.fillRect(0, 0, 1200, 630);
-    // Left stripe
-    ctx.fillStyle = '#FF5A36'; ctx.fillRect(0, 0, 8, 630);
-    // T horizontal bar
-    ctx.fillStyle = '#FF5A36'; ctx.fillRect(80, 72, 120, 24);
-    // T vertical bar
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(124, 90, 24, 82);
-    // GPS dot
-    ctx.fillStyle = '#FF5A36'; ctx.beginPath(); ctx.arc(188, 165, 13, 0, Math.PI*2); ctx.fill();
-    // Wordmark
-    ctx.fillStyle = '#ffffff';
-    ctx.font = fntBold ? 'bold 74px "OGBold"' : 'bold 74px sans-serif';
-    ctx.fillText('TRAZO', 230, 162);
-    // Underline
-    ctx.fillStyle = '#FF5A36'; ctx.fillRect(230, 172, 320, 5);
-    // Divider
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(80, 218, 1040, 1);
-    // Product name
-    ctx.fillStyle = '#ffffff';
-    ctx.font = fntBold ? 'bold 42px "OGBold"' : 'bold 42px sans-serif';
-    ctx.fillText(product, 80, 300);
-    // Badge
-    ctx.fillStyle = stepColor; ctx.fillRect(80, 318, Math.min(step.length * 16 + 48, 700), 50);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = fntBold ? 'bold 26px "OGBold"' : 'bold 26px sans-serif';
-    ctx.fillText(step, 104, 352);
-    // Recipient
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = fntReg ? '26px "OGReg"' : '26px sans-serif';
-    ctx.fillText(('Para: '+recipient+(dest?' · '+dest:'')).substring(0,60), 80, 420);
-    // Code
+    // ── Fondo ──
+    fillRect(ctx, 0, 0, W, H, '#15182B');
+
+    // ── Franja izquierda naranja ──
+    fillRect(ctx, 0, 0, 12, H, '#FF5A36');
+
+    // ── Banda superior oscura ──
+    fillRect(ctx, 0, 0, W, 200, '#0D0F1D');
+
+    // ── T grande (logo) ──
+    // Barra horizontal
+    fillRect(ctx, 60, 55, 140, 30, '#FF5A36');
+    // Barra vertical
+    fillRect(ctx, 110, 80, 30, 100, '#ffffff');
+    // Punto GPS
     ctx.fillStyle = '#FF5A36';
-    ctx.font = fntReg ? '22px "OGReg"' : '22px sans-serif';
-    ctx.fillText('Código: '+code, 80, 468);
-    // Footer
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 572, 1200, 58);
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = fntReg ? '20px "OGReg"' : '20px sans-serif';
+    ctx.beginPath(); ctx.arc(218, 172, 18, 0, Math.PI*2); ctx.fill();
+    // Punto GPS interior
+    ctx.fillStyle = '#0D0F1D';
+    ctx.beginPath(); ctx.arc(218, 172, 8, 0, Math.PI*2); ctx.fill();
+
+    // ── TRAZO wordmark ──
+    ctx.fillStyle = '#ffffff';
+    ctx.font = bold.replace('1px', '88px');
+    ctx.fillText('TRAZO', 260, 158);
+
+    // ── Línea naranja bajo wordmark ──
+    fillRect(ctx, 260, 168, 390, 6, '#FF5A36');
+
+    // ── "Delivery en tiempo real" ──
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = reg.replace('1px', '22px');
+    ctx.fillText('DELIVERY EN TIEMPO REAL', 262, 196);
+
+    // ── Separador ──
+    fillRect(ctx, 60, 210, W-120, 1, 'rgba(255,255,255,0.08)');
+
+    // ── Nombre del pedido ──
+    ctx.fillStyle = '#ffffff';
+    ctx.font = bold.replace('1px', '48px');
+    ctx.fillText(product, 60, 295);
+
+    // ── Badge estado ──
+    const badgeW = Math.min(step.length * 18 + 60, 680);
+    fillRect(ctx, 60, 318, badgeW, 56, stepColor);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = bold.replace('1px', '28px');
+    ctx.fillText(step, 84, 356);
+
+    // ── Destinatario ──
+    if (recipient) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = reg.replace('1px', '28px');
+      const recLine = ('Para: ' + recipient + (dest ? '  ·  ' + dest : '')).substring(0, 58);
+      ctx.fillText(recLine, 60, 425);
+    }
+
+    // ── Código ──
+    ctx.fillStyle = '#FF5A36';
+    ctx.font = reg.replace('1px', '24px');
+    ctx.fillText('Código: ' + code, 60, 472);
+
+    // ── Footer ──
+    fillRect(ctx, 0, H-64, W, 64, 'rgba(0,0,0,0.4)');
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = reg.replace('1px', '21px');
     ctx.textAlign = 'center';
-    ctx.fillText('Tocá para ver el seguimiento GPS en vivo · trazo-hbrf.onrender.com', 600, 607);
+    ctx.fillText('Tocá para ver el seguimiento GPS en vivo  ·  trazo-hbrf.onrender.com', W/2, H-24);
 
     const chunks = [];
     const stream = new PassThrough();
@@ -281,14 +323,15 @@ app.get('/og-image/:code', async (req, res) => {
     });
     const buf = Buffer.concat(chunks);
     ogCache.set(code, { buf, ts: Date.now() });
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.setHeader('Content-Type','image/png');
+    res.setHeader('Cache-Control','public, max-age=60');
     res.send(buf);
   } catch(e) {
-    console.error('OG image error:', e.message);
-    res.status(500).send('Error generando imagen');
+    console.error('OG error:', e.message);
+    res.status(500).send('Error');
   }
 });
+
 
 app.get('/health', (req, res) => res.json({ status:'ok' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
