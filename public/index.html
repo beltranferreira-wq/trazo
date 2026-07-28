@@ -8,12 +8,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trazo">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Seguí tus envíos en tiempo real con GPS del transportista">
+<meta name="description" content="Seguí tu pedido en tiempo real con GPS del repartidor">
 <link rel="manifest" href="/manifest.json">
 
 
 
-<title>Trazo</title>
+<title>TRAZO — Delivery en tiempo real</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -539,7 +539,7 @@ img,svg{display:block;}
     <div class="brand-mark">
       <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
     </div>
-    <div class="brand"><b>Trazo</b><span>Seguimiento de envíos</span></div>
+    <div class="brand"><b>TRAZO</b><span>Delivery en tiempo real</span></div>
     <div class="topbar-btns">
       <button class="iBtn" id="notifMobileBtn">
         <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -562,9 +562,9 @@ img,svg{display:block;}
   <aside class="sidebar" style="display:none" id="sidebar">
     <div class="sidebar-header">
       <div class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+        <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/><circle cx="24" cy="24" r="2.5" fill="#FF5A36" opacity="0.55"/></svg>
       </div>
-      <div class="sidebar-title"><b>Trazo</b><span>Seguimiento de envíos</span></div>
+      <div class="sidebar-title"><b>TRAZO</b><span>Delivery en tiempo real</span></div>
       <button class="iBtn" id="notifDeskBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-pip" id="notifDot2" style="display:none">0</span>
@@ -647,7 +647,7 @@ img,svg{display:block;}
 <div class="modal-sheet" id="modalSheet">
   <div class="modal-drag"></div>
   <h2 class="modal-h">Nuevo envío</h2>
-  <p class="modal-sub">Completá los datos del pedido para empezar el seguimiento.</p>
+  <p class="modal-sub">Ingresá los datos del pedido para compartir el seguimiento en vivo con el cliente.</p>
 
   <div class="fsec">Producto</div>
   <div class="fg"><label>Nombre del producto *</label><input id="f-prod" placeholder="Ej: Mochila urbana 25L" autocomplete="off"></div>
@@ -760,7 +760,7 @@ let detailMap = null;
 let detailMarkers = {};
 let toastTimer;
 
-const STEPS = ['Compra confirmada','Preparando pedido','Despachado','En camino','En reparto','Entregado'];
+const STEPS = ['🍔 Preparando tu pedido','🛵 En camino','📍 A punto de llegar','✅ Entregado'];
 
 // ─── Toast ────────────────────────────────────────────────────────────────
 function toast(msg) {
@@ -788,11 +788,11 @@ function fmtDate(iso) {
   return `${d.getDate()} ${M[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 function badge(s) {
-  if (s.alert) return { t:'Demorado', c:'b-warn' };
-  if (s.currentStep===5) return { t:'Entregado', c:'b-success' };
-  if (s.currentStep===4) return { t:'En reparto hoy', c:'b-accent' };
-  if (s.currentStep===3) return { t:'En camino', c:'b-accent' };
-  return { t: STEPS[s.currentStep], c:'b-amber' };
+  if (s.alert) return { t:'⚠️ Demorado', c:'b-warn' };
+  if (s.currentStep===3) return { t:'✅ Entregado', c:'b-success' };
+  if (s.currentStep===2) return { t:'📍 A punto de llegar', c:'b-accent' };
+  if (s.currentStep===1) return { t:'🛵 En camino', c:'b-accent' };
+  return { t:'🍔 Preparando', c:'b-amber' };
 }
 function waUrl(s) {
   const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
@@ -838,7 +838,7 @@ function renderList(q='') {
   if (!fl.length) {
     wrap.innerHTML = `<div class="empty-state">
       <h2>${shipments.length ? 'Sin resultados' : '¡Empezá ahora!'}</h2>
-      <p>${shipments.length ? 'Probá con otra búsqueda.' : 'Creá tu primer envío y compartí el seguimiento en tiempo real con el transportista y el cliente.'}</p>
+      <p>${shipments.length ? 'Probá con otra búsqueda.' : 'Creá un nuevo pedido y compartí el link de seguimiento con tu cliente por WhatsApp.'}</p>
       ${!shipments.length ? `<button class="empty-cta" id="emptyCta">+ Crear primer envío</button>` : ''}
     </div>`;
     document.getElementById('emptyCta')?.addEventListener('click', openModal);
@@ -932,8 +932,8 @@ function renderDetail(s) {
     ? `<div class="alert-box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>${s.alert}</div>` : '';
 
   const advHtml = s.currentStep < 5
-    ? `<button class="btn-advance" id="advBtn">Avanzar a «${STEPS[s.currentStep+1]}» <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
-    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Entregado correctamente</div>`;
+    ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
+    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
 
   document.getElementById('detailContent').innerHTML = `
     <div class="dcard-top">
@@ -1032,10 +1032,10 @@ async function advanceStep(id) {
     const updated = await api.patch(`/api/shipments/${id}/advance`);
     const i = shipments.findIndex(x=>x.id===id);
     if(i>=0) shipments[i] = updated;
-    addNotif(updated, `Estado: ${STEPS[updated.currentStep]}`);
+    addNotif(updated, `Pedido actualizado: ${STEPS[updated.currentStep]}`);
     renderList(document.getElementById('searchInput').value);
     renderDetail(updated);
-    toast(`Avanzado a «${STEPS[updated.currentStep]}» ✓`);
+    toast(`${STEPS[updated.currentStep]} ✓`);
   } catch(e) { toast('Error al actualizar'); }
 }
 
