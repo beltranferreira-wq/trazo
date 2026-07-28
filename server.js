@@ -132,6 +132,116 @@ app.delete('/api/shipments/:id', (req, res) => {
   delete db.shipments[req.params.id]; save(db); res.json({ ok:true });
 });
 
+
+// ─── WhatsApp preview card ─────────────────────────────────────────────────
+// When WhatsApp scrapes the link, it gets OG meta tags with shipment info.
+// The browser gets redirected instantly to the live tracking page.
+app.get('/share/:code', (req, res) => {
+  const code = req.params.code;
+  const s = Object.values(db.shipments).find(x => x.tracking === code);
+
+  const STEP_LABELS = [
+    '🍔 Preparando tu pedido',
+    '🛵 En camino',
+    '📍 A punto de llegar',
+    '✅ Entregado'
+  ];
+
+  const title = s
+    ? `${s.emoji} ${s.product} — TRAZO`
+    : 'TRAZO · Seguimiento en vivo';
+
+  const description = s
+    ? `${STEP_LABELS[s.currentStep] || 'En proceso'} · Para: ${s.recipient}${s.destName ? ' · ' + s.destName.split(',')[0] : ''}`
+    : 'Seguí tu pedido en tiempo real con GPS del repartidor.';
+
+  const liveUrl = `${req.protocol}://${req.get('host')}/live.html?code=${encodeURIComponent(code)}`;
+  const imageUrl = `${req.protocol}://${req.get('host')}/og-image/${encodeURIComponent(code)}`;
+
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description}">
+<meta property="og:image" content="${imageUrl}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="${liveUrl}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TRAZO · Delivery en tiempo real">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${description}">
+<meta name="twitter:image" content="${imageUrl}">
+<meta http-equiv="refresh" content="0;url=${liveUrl}">
+<script>window.location.replace('${liveUrl}');</script>
+</head>
+<body style="background:#15182B;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+<p>Redirigiendo al seguimiento en vivo...</p>
+</body>
+</html>`);
+});
+
+// ─── OG Image (SVG dinámico para la tarjeta de WhatsApp) ───────────────────
+app.get('/og-image/:code', (req, res) => {
+  const code = req.params.code;
+  const s = Object.values(db.shipments).find(x => x.tracking === code);
+
+  const STEP_LABELS = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
+  const STEP_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
+
+  const emoji    = s ? s.emoji : '📦';
+  const product  = s ? s.product.substring(0, 40) + (s.product.length > 40 ? '…' : '') : 'Tu pedido';
+  const step     = s ? (STEP_LABELS[s.currentStep] || 'En proceso') : 'Seguimiento en vivo';
+  const stepColor= s ? (STEP_COLORS[s.currentStep] || '#FF5A36') : '#FF5A36';
+  const recipient= s ? s.recipient : '';
+  const dest     = s && s.destName ? s.destName.split(',')[0] : '';
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#15182B"/>
+  <rect x="0" y="0" width="8" height="630" fill="#FF5A36"/>
+
+  <!-- Logo T -->
+  <rect x="80" y="80" width="120" height="28" rx="14" fill="#FF5A36"/>
+  <rect x="124" y="108" width="28" height="80" rx="14" fill="#ffffff"/>
+  <circle cx="184" cy="172" r="14" fill="#FF5A36"/>
+
+  <!-- TRAZO wordmark -->
+  <text x="230" y="162" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="72" fill="#ffffff" letter-spacing="-2">TRAZO</text>
+  <rect x="230" y="172" width="320" height="6" rx="3" fill="#FF5A36"/>
+
+  <!-- Divider -->
+  <rect x="80" y="230" width="1040" height="2" fill="#ffffff" opacity="0.1"/>
+
+  <!-- Emoji grande -->
+  <text x="80" y="380" font-size="120">${emoji}</text>
+
+  <!-- Producto -->
+  <text x="240" y="310" font-family="Arial,sans-serif" font-weight="700" font-size="48" fill="#ffffff">${product}</text>
+
+  <!-- Estado badge -->
+  <rect x="240" y="330" width="${step.length * 18 + 40}" height="52" rx="26" fill="${stepColor}"/>
+  <text x="${240 + step.length * 9 + 20}" y="364" font-family="Arial,sans-serif" font-weight="700" font-size="26" fill="#ffffff" text-anchor="middle">${step}</text>
+
+  <!-- Destinatario -->
+  <text x="240" y="430" font-family="Arial,sans-serif" font-size="30" fill="#ffffff" opacity="0.6">Para: ${recipient}${dest ? '  ·  ' + dest : ''}</text>
+
+  <!-- Código -->
+  <text x="240" y="480" font-family="Courier New,monospace" font-size="24" fill="#FF5A36" opacity="0.8">Código: ${code}</text>
+
+  <!-- Footer -->
+  <rect x="0" y="570" width="1200" height="60" fill="#000000" opacity="0.3"/>
+  <text x="600" y="607" font-family="Arial,sans-serif" font-size="22" fill="#ffffff" opacity="0.5" text-anchor="middle">Tocá para ver el seguimiento GPS en vivo · trazo-hbrf.onrender.com</text>
+</svg>`;
+
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  res.send(svg);
+});
+
 app.get('/health', (req, res) => res.json({ status:'ok' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
