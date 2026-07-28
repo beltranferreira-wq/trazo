@@ -1,0 +1,13 @@
+{
+  "name": "trazo-app",
+  "version": "1.0.0",
+  "description": "Seguimiento de envios en tiempo real",
+  "main": "server.js",
+  "engines": { "node": "18.x" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.18.2",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
+  }
+}
