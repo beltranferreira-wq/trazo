@@ -185,61 +185,109 @@ app.get('/share/:code', (req, res) => {
 </html>`);
 });
 
-// ─── OG Image (SVG dinámico para la tarjeta de WhatsApp) ───────────────────
-app.get('/og-image/:code', (req, res) => {
+// ─── OG Image PNG (para tarjeta de WhatsApp) ──────────────────────────────
+const pureimage = require('pureimage');
+const { PassThrough } = require('stream');
+
+// Pre-cargar fuentes al iniciar el servidor
+let fntBold = null, fntReg = null;
+(async () => {
+  try {
+    fntBold = pureimage.registerFont('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'OGBold');
+    fntReg  = pureimage.registerFont('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'OGReg');
+    await fntBold.load();
+    await fntReg.load();
+    console.log('Fuentes OG cargadas OK');
+  } catch(e) { console.log('Fuentes OG no disponibles:', e.message); }
+})();
+
+const OG_STEP_LABELS = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
+const OG_STEP_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
+
+const ogCache = new Map();
+
+app.get('/og-image/:code', async (req, res) => {
   const code = req.params.code;
+
+  // Cache 60 segundos
+  if (ogCache.has(code)) {
+    const { buf, ts } = ogCache.get(code);
+    if (Date.now() - ts < 60000) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      return res.send(buf);
+    }
+  }
+
   const s = Object.values(db.shipments).find(x => x.tracking === code);
-
-  const STEP_LABELS = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
-  const STEP_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
-
-  const emoji    = s ? s.emoji : '📦';
-  const product  = s ? s.product.substring(0, 40) + (s.product.length > 40 ? '…' : '') : 'Tu pedido';
-  const step     = s ? (STEP_LABELS[s.currentStep] || 'En proceso') : 'Seguimiento en vivo';
-  const stepColor= s ? (STEP_COLORS[s.currentStep] || '#FF5A36') : '#FF5A36';
+  const product  = s ? (s.product.length > 40 ? s.product.substring(0,40)+'…' : s.product) : 'Tu pedido';
+  const step     = s ? (OG_STEP_LABELS[s.currentStep] || 'En proceso') : 'Seguimiento en vivo';
+  const stepColor= s ? (OG_STEP_COLORS[s.currentStep] || '#FF5A36') : '#FF5A36';
   const recipient= s ? s.recipient : '';
   const dest     = s && s.destName ? s.destName.split(',')[0] : '';
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#15182B"/>
-  <rect x="0" y="0" width="8" height="630" fill="#FF5A36"/>
+  try {
+    const img = pureimage.make(1200, 630);
+    const ctx = img.getContext('2d');
 
-  <!-- Logo T -->
-  <rect x="80" y="80" width="120" height="28" rx="14" fill="#FF5A36"/>
-  <rect x="124" y="108" width="28" height="80" rx="14" fill="#ffffff"/>
-  <circle cx="184" cy="172" r="14" fill="#FF5A36"/>
+    // Background
+    ctx.fillStyle = '#15182B'; ctx.fillRect(0, 0, 1200, 630);
+    // Left stripe
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(0, 0, 8, 630);
+    // T horizontal bar
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(80, 72, 120, 24);
+    // T vertical bar
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(124, 90, 24, 82);
+    // GPS dot
+    ctx.fillStyle = '#FF5A36'; ctx.beginPath(); ctx.arc(188, 165, 13, 0, Math.PI*2); ctx.fill();
+    // Wordmark
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fntBold ? 'bold 74px "OGBold"' : 'bold 74px sans-serif';
+    ctx.fillText('TRAZO', 230, 162);
+    // Underline
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(230, 172, 320, 5);
+    // Divider
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(80, 218, 1040, 1);
+    // Product name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fntBold ? 'bold 42px "OGBold"' : 'bold 42px sans-serif';
+    ctx.fillText(product, 80, 300);
+    // Badge
+    ctx.fillStyle = stepColor; ctx.fillRect(80, 318, Math.min(step.length * 16 + 48, 700), 50);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fntBold ? 'bold 26px "OGBold"' : 'bold 26px sans-serif';
+    ctx.fillText(step, 104, 352);
+    // Recipient
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = fntReg ? '26px "OGReg"' : '26px sans-serif';
+    ctx.fillText(('Para: '+recipient+(dest?' · '+dest:'')).substring(0,60), 80, 420);
+    // Code
+    ctx.fillStyle = '#FF5A36';
+    ctx.font = fntReg ? '22px "OGReg"' : '22px sans-serif';
+    ctx.fillText('Código: '+code, 80, 468);
+    // Footer
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 572, 1200, 58);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = fntReg ? '20px "OGReg"' : '20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tocá para ver el seguimiento GPS en vivo · trazo-hbrf.onrender.com', 600, 607);
 
-  <!-- TRAZO wordmark -->
-  <text x="230" y="162" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="72" fill="#ffffff" letter-spacing="-2">TRAZO</text>
-  <rect x="230" y="172" width="320" height="6" rx="3" fill="#FF5A36"/>
-
-  <!-- Divider -->
-  <rect x="80" y="230" width="1040" height="2" fill="#ffffff" opacity="0.1"/>
-
-  <!-- Emoji grande -->
-  <text x="80" y="380" font-size="120">${emoji}</text>
-
-  <!-- Producto -->
-  <text x="240" y="310" font-family="Arial,sans-serif" font-weight="700" font-size="48" fill="#ffffff">${product}</text>
-
-  <!-- Estado badge -->
-  <rect x="240" y="330" width="${step.length * 18 + 40}" height="52" rx="26" fill="${stepColor}"/>
-  <text x="${240 + step.length * 9 + 20}" y="364" font-family="Arial,sans-serif" font-weight="700" font-size="26" fill="#ffffff" text-anchor="middle">${step}</text>
-
-  <!-- Destinatario -->
-  <text x="240" y="430" font-family="Arial,sans-serif" font-size="30" fill="#ffffff" opacity="0.6">Para: ${recipient}${dest ? '  ·  ' + dest : ''}</text>
-
-  <!-- Código -->
-  <text x="240" y="480" font-family="Courier New,monospace" font-size="24" fill="#FF5A36" opacity="0.8">Código: ${code}</text>
-
-  <!-- Footer -->
-  <rect x="0" y="570" width="1200" height="60" fill="#000000" opacity="0.3"/>
-  <text x="600" y="607" font-family="Arial,sans-serif" font-size="22" fill="#ffffff" opacity="0.5" text-anchor="middle">Tocá para ver el seguimiento GPS en vivo · trazo-hbrf.onrender.com</text>
-</svg>`;
-
-  res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=60');
-  res.send(svg);
+    const chunks = [];
+    const stream = new PassThrough();
+    stream.on('data', d => chunks.push(d));
+    await new Promise((resolve, reject) => {
+      stream.on('end', resolve); stream.on('error', reject);
+      pureimage.encodePNGToStream(img, stream);
+    });
+    const buf = Buffer.concat(chunks);
+    ogCache.set(code, { buf, ts: Date.now() });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.send(buf);
+  } catch(e) {
+    console.error('OG image error:', e.message);
+    res.status(500).send('Error generando imagen');
+  }
 });
 
 app.get('/health', (req, res) => res.json({ status:'ok' }));
