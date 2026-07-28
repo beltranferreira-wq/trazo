@@ -10,8 +10,8 @@
 <link rel="manifest" href="/manifest.json">
 
 
-<title>Trazo · Seguimiento en vivo</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>TRAZO · Tu pedido en camino</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -201,10 +201,10 @@ a{text-decoration:none;}
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="brand-mark">
-    <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/></svg>
   </div>
   <div class="topbar-text">
-    <div class="topbar-product" id="topProduct">Trazo · Seguimiento en vivo</div>
+    <div class="topbar-product" id="topProduct">TRAZO · Tu pedido en camino</div>
     <div class="topbar-sub" id="topCarrier">Conectando…</div>
   </div>
   <div class="live-chip" id="liveChip">
@@ -248,7 +248,7 @@ a{text-decoration:none;}
   <div class="status-row" id="statusRow">
     <div class="sdot waiting" id="sdot"></div>
     <div class="stext">
-      <b id="stextMain">Esperando al transportista…</b>
+      <b id="stextMain">Esperando al repartidor…</b>
       <small id="stextSub"></small>
     </div>
   </div>
@@ -263,7 +263,7 @@ a{text-decoration:none;}
     <div class="mr-row" id="mrCr">
       <div class="mr-line"></div>
       <div class="mr-dot cr"></div>
-      <span class="mr-lbl">Transportista</span>
+      <span class="mr-lbl">Repartidor</span>
       <span class="mr-val mono" id="mrCrVal">Sin señal</span>
     </div>
     <div class="mr-row">
@@ -275,7 +275,7 @@ a{text-decoration:none;}
 
   <button class="btn-courier" id="courierBtn">
     <svg viewBox="0 0 24 24"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg>
-    Soy el transportista — Activar GPS
+    🛵 Soy el repartidor — Activar GPS
   </button>
   <div class="sheet-pad"></div>
 </div>
@@ -284,13 +284,13 @@ a{text-decoration:none;}
 <div class="invalid" id="invalidScreen" style="display:none">
   <div class="invalid-icon">📦</div>
   <h2>Enlace no encontrado</h2>
-  <p>Este enlace de seguimiento no existe o ya expiró.<br>Pedile al comercio que te reenvíe el enlace.</p>
+  <p>Este enlace no existe o el pedido ya fue entregado.<br>Pedile al local que te reenvíe el link.</p>
 </div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
 
@@ -519,19 +519,19 @@ function updateStatus(s) {
   } else if (s.courierActive && s.courierLat) {
     sdot.classList.add('active');
     const ago = timeAgo(s.positionUpdatedAt);
-    main.textContent='Transportista en movimiento';
+    main.textContent='🛵 Repartidor en camino';
     sub.textContent =`GPS activo · última posición: ${ago}`;
     chip.className='live-chip active';
     chipT.textContent='GPS en vivo';
   } else if (s.courierLat) {
     sdot.classList.add('waiting');
-    main.textContent='Transportista pausó el GPS';
+    main.textContent='Repartidor pausó el GPS';
     sub.textContent ='La última posición conocida se muestra en el mapa';
     chip.className='live-chip';
     chipT.textContent='GPS pausado';
   } else {
     sdot.classList.add('offline');
-    main.textContent='Esperando al transportista…';
+    main.textContent='Esperando al repartidor…';
     sub.textContent ='El mapa se actualizará cuando el GPS esté activo';
     chip.className='live-chip';
     chipT.textContent='Sin GPS';
@@ -638,13 +638,13 @@ function startGPS() {
         courierSharing = true;
         courierBtn.disabled = false;
         courierBtn.classList.add('sharing');
-        courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> GPS activo — Tocá para detener`;
+        courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 📍 GPS activo — Tocá para detener`;
         toast('📍 GPS activado. Todos pueden ver tu posición en tiempo real.');
       }
     },
     err => {
       courierBtn.disabled = false;
-      courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Soy el transportista — Activar GPS`;
+      courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 🛵 Soy el repartidor — Activar GPS`;
       const msgs = {1:'Permiso de GPS denegado. Habilitalo en ajustes del navegador.',2:'GPS no disponible en este momento.',3:'Tiempo de espera agotado. Intentá de nuevo.'};
       toast(msgs[err.code]||'No se pudo obtener el GPS.');
       courierSharing=false;
@@ -661,7 +661,7 @@ function stopGPS() {
   }
   if (shipment) { shipment.courierActive=false; updateStatus(shipment); }
   courierBtn.classList.remove('sharing');
-  courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Soy el transportista — Activar GPS`;
+  courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 🛵 Soy el repartidor — Activar GPS`;
   toast('GPS detenido.');
 }
 
