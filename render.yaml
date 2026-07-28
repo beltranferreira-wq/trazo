@@ -3,6 +3,6 @@ services:
     name: trazo-app
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: apt-get install -y fonts-dejavu-core fonts-liberation && npm install
     startCommand: node server.js
     healthCheckPath: /health
