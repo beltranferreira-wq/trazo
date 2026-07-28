@@ -664,10 +664,11 @@ img,svg{display:block;}
   <div class="fsec">Punto de origen</div>
   <div class="fg"><label>Nombre del local / depósito *</label><input id="f-oname" placeholder="Ej: Sucursal Centro — Florida 234"></div>
   <div class="frow">
-    <div class="fg"><label>Latitud</label><input id="f-olat" type="number" step="any" placeholder="-34.6007"></div>
-    <div class="fg"><label>Longitud</label><input id="f-olng" type="number" step="any" placeholder="-58.3731"></div>
+    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..."></div>
+    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..."></div>
   </div>
-  <button class="btn-geo" id="geoBtn">
+  <p style="font-size:11px;color:var(--muted);margin:-8px 0 8px;padding:0 2px;">💡 Las coordenadas mejoran el mapa. Podés usar el botón de abajo o dejarlas vacías — el sistema las busca automáticamente por la dirección.</p>
+      <button class="btn-geo" id="geoBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg>
     Usar mi ubicación actual como origen
   </button>
@@ -675,10 +676,11 @@ img,svg{display:block;}
   <div class="fsec">Destino de entrega</div>
   <div class="fg"><label>Dirección completa del cliente *</label><input id="f-dname" placeholder="Ej: Av. Rivadavia 4521, 3°B — CABA"></div>
   <div class="frow">
-    <div class="fg"><label>Latitud</label><input id="f-dlat" type="number" step="any" placeholder="-34.6217"></div>
-    <div class="fg"><label>Longitud</label><input id="f-dlng" type="number" step="any" placeholder="-58.4341"></div>
+    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlat" type="number" step="any" placeholder="Se completa solo..."></div>
+    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlng" type="number" step="any" placeholder="Se completa solo..."></div>
   </div>
 
+  <div id="geo-status-dest" style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 6px;transition:color .3s;"></div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
     <button class="btn-cancel" id="cancelBtn">Cancelar</button>
@@ -1136,6 +1138,49 @@ function closeModal() {
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
 ['addTopBtn','addListBtn','addDeskBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',openModal));
+
+// ─── Geocodificación automática de direcciones ────────────────────────────
+let geoTimerOrigin = null;
+let geoTimerDest   = null;
+
+async function geocodeAddress(address, latId, lngId, statusId) {
+  const statusEl = document.getElementById(statusId);
+  if (!address || address.trim().length < 6) return;
+  if (statusEl) statusEl.textContent = '🔍 Buscando...';
+  try {
+    const query = address.trim() + ', Argentina';
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ar`,
+      { headers: { 'Accept-Language': 'es', 'User-Agent': 'Trazo-App/1.0' } }
+    );
+    const d = await r.json();
+    if (d && d[0]) {
+      document.getElementById(latId).value = parseFloat(d[0].lat).toFixed(6);
+      document.getElementById(lngId).value = parseFloat(d[0].lon).toFixed(6);
+      if (statusEl) { statusEl.textContent = '✅ ' + d[0].display_name.split(',').slice(0,2).join(','); statusEl.style.color = 'var(--success)'; }
+    } else {
+      if (statusEl) { statusEl.textContent = '⚠️ No encontrada — revisá la dirección'; statusEl.style.color = 'var(--amber)'; }
+    }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠️ Sin conexión para buscar'; statusEl.style.color = 'var(--muted)'; }
+  }
+}
+
+document.getElementById('f-oname').addEventListener('input', (e) => {
+  clearTimeout(geoTimerOrigin);
+  const val = e.target.value;
+  const statusEl = document.getElementById('geo-status-origin');
+  if (statusEl) statusEl.textContent = '';
+  geoTimerOrigin = setTimeout(() => geocodeAddress(val, 'f-olat', 'f-olng', 'geo-status-origin'), 900);
+});
+
+document.getElementById('f-dname').addEventListener('input', (e) => {
+  clearTimeout(geoTimerDest);
+  const val = e.target.value;
+  const statusEl = document.getElementById('geo-status-dest');
+  if (statusEl) statusEl.textContent = '';
+  geoTimerDest = setTimeout(() => geocodeAddress(val, 'f-dlat', 'f-dlng', 'geo-status-dest'), 900);
+});
 
 document.getElementById('geoBtn').onclick = () => {
   if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
