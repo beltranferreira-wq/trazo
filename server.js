@@ -102,6 +102,7 @@ app.post('/api/shipments', (req, res) => {
     carrier: b.carrier||'Repartidor',
     recipient: b.recipient||'Cliente',
     phone: b.phone||'',
+    courierPhone: b.courierPhone||'',
     originName: b.originName||'',
     originLat: parseFloat(b.originLat)||null,
     originLng: parseFloat(b.originLng)||null,
