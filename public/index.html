@@ -796,7 +796,7 @@ function badge(s) {
   return { t:'🍔 Preparando', c:'b-amber' };
 }
 function waUrlCourier(s) {
-  const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
+  const live = `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
   const txt = `🛵 *TRAZO* — Activá el GPS para este pedido:\n\n*${s.product}*\nCliente: ${s.recipient}\nDestino: ${s.destName||'ver en el mapa'}\n\n${live}\n\n👆 Abrí el link y tocá "Soy el repartidor — Activar GPS"`;
   const ph = (s.courierPhone||'').replace(/\D/g,'');
   return ph ? `https://wa.me/${ph}?text=${encodeURIComponent(txt)}`
@@ -810,7 +810,7 @@ function waUrl(s) {
             : `https://wa.me/?text=${encodeURIComponent(txt)}`;
 }
 function liveUrl(s) {
-  return `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
+  return `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────
@@ -1004,7 +1004,7 @@ function renderDetail(s) {
   document.getElementById('copyCodeBtn').onclick = () =>
     navigator.clipboard.writeText(s.tracking).then(()=>toast('Código copiado ✓')).catch(()=>{});
   document.getElementById('copyLinkBtn').onclick = () =>
-    navigator.clipboard.writeText(liveUrl(s)).then(()=>toast('Enlace copiado ✓')).catch(()=>{});
+    navigator.clipboard.writeText(`${location.origin}/share/${encodeURIComponent(s.tracking)}`).then(()=>toast('Enlace copiado ✓')).catch(()=>{});
   document.getElementById('advBtn')?.addEventListener('click', () => advanceStep(s.id));
   document.getElementById('delBtn').onclick = () => deleteShipment(s.id);
 }
