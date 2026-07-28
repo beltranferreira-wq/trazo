@@ -658,6 +658,7 @@ img,svg{display:block;}
   <div class="frow">
     <div class="fg"><label>Destinatario</label><input id="f-rec" placeholder="Nombre completo"></div>
     <div class="fg"><label>WhatsApp del cliente</label><input id="f-phone" type="tel" placeholder="+549..."></div>
+      <div class="fg"><label>WhatsApp del repartidor</label><input id="f-courier-phone" type="tel" placeholder="+549..."></div>
   </div>
 
   <div class="fsec">Punto de origen</div>
@@ -794,6 +795,13 @@ function badge(s) {
   if (s.currentStep===1) return { t:'🛵 En camino', c:'b-accent' };
   return { t:'🍔 Preparando', c:'b-amber' };
 }
+function waUrlCourier(s) {
+  const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
+  const txt = `🛵 *TRAZO* — Activá el GPS para este pedido:\n\n*${s.product}*\nCliente: ${s.recipient}\nDestino: ${s.destName||'ver en el mapa'}\n\n${live}\n\n👆 Abrí el link y tocá "Soy el repartidor — Activar GPS"`;
+  const ph = (s.courierPhone||'').replace(/\D/g,'');
+  return ph ? `https://wa.me/${ph}?text=${encodeURIComponent(txt)}`
+            : `https://wa.me/?text=${encodeURIComponent(txt)}`;
+}
 function waUrl(s) {
   const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
   const txt = `🚚 *Trazo* — Seguí tu pedido en tiempo real:\n\n📦 *${s.product}*\nCódigo: \`${s.tracking}\`\n\n${live}`;
@@ -856,7 +864,7 @@ function renderList(q='') {
         <div class="scard-recip">${s.recipient}${s.originName?' · '+s.originName.split('—')[0].trim():''}</div>
         <span class="badge ${b.c}">${b.t}</span>
       </div>
-      <a class="share-pill" href="${wa}" target="_blank" rel="noopener" aria-label="Enviar por WhatsApp"
+      <a class="share-pill" href="${wa}" target="_blank" rel="noopener" aria-label="Enviar link al cliente por WhatsApp"
          onclick="event.stopPropagation()">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
       </a>
@@ -967,7 +975,8 @@ function renderDetail(s) {
       <div class="block-label">Destinatario</div>
       <div class="info-grid">
         <div class="ii"><div class="ii-l">Nombre</div><div class="ii-v">${s.recipient||'—'}</div></div>
-        <div class="ii"><div class="ii-l">WhatsApp</div><div class="ii-v">${s.phone||'—'}</div></div>
+        <div class="ii"><div class="ii-l">WhatsApp cliente</div><div class="ii-v">${s.phone||'—'}</div></div>
+        <div class="ii"><div class="ii-l">WhatsApp repartidor</div><div class="ii-v">${s.courierPhone||'—'}</div></div>
       </div>
     </div>
 
@@ -975,7 +984,11 @@ function renderDetail(s) {
       ${advHtml}
       <a class="btn-wa-big" id="waClientBtn" href="${waUrl(s)}" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
-        Enviar seguimiento al cliente
+        📱 Enviar link al cliente
+      </a>
+      <a class="btn-wa-big" id="waCourierBtn" href="${waUrlCourier(s)}" target="_blank" rel="noopener" style="background:#15182B;">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
+        🛵 Enviar GPS al repartidor
       </a>
       <button class="btn-copy-link" id="copyLinkBtn">
         <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
@@ -1117,7 +1130,7 @@ function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
   document.getElementById('modalSheet').classList.remove('open');
   document.body.style.overflow='';
-  ['f-prod','f-car','f-code','f-rec','f-phone','f-oname','f-olat','f-olng','f-dname','f-dlat','f-dlng']
+  ['f-prod','f-car','f-code','f-rec','f-phone','f-courier-phone','f-oname','f-olat','f-olng','f-dname','f-dlat','f-dlng']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 document.getElementById('modalBg').onclick = closeModal;
@@ -1148,6 +1161,7 @@ document.getElementById('submitBtn').onclick = async () => {
     tracking: document.getElementById('f-code').value,
     recipient: document.getElementById('f-rec').value,
     phone: document.getElementById('f-phone').value,
+    courierPhone: document.getElementById('f-courier-phone').value,
     originName: document.getElementById('f-oname').value,
     originLat: document.getElementById('f-olat').value,
     originLng: document.getElementById('f-olng').value,
