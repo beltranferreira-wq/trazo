@@ -186,41 +186,35 @@ app.get('/share/:code', (req, res) => {
 });
 
 // ─── OG Image PNG (para tarjeta de WhatsApp) ──────────────────────────────
-const pureimage = require('pureimage');
+const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
 const { PassThrough } = require('stream');
 
-const FONT_PATHS = [
-  ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'OGBold'],
-  ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'OGReg'],
-  ['/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 'OGBold'],
-  ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 'OGReg'],
+// Registrar fuentes al iniciar
+const FONT_CANDIDATES = [
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',    'TrazoBold'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 'TrazoBold'],
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',         'TrazoReg'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 'TrazoReg'],
 ];
+let boldFont = 'bold 1px sans-serif';
+let regFont  = '1px sans-serif';
 
-let ogFontsLoaded = false;
-(async () => {
-  for (const [p, name] of FONT_PATHS) {
-    if (ogFontsLoaded) break;
-    try {
-      if (fs.existsSync(p)) {
-        const f = pureimage.registerFont(p, name);
-        await f.load();
-        ogFontsLoaded = true;
-        console.log('Fuente OG cargada:', p);
-      }
-    } catch(e) {}
-  }
-  if (!ogFontsLoaded) console.log('Usando fuente fallback para OG images');
-})();
+FONT_CANDIDATES.forEach(([p, name]) => {
+  try {
+    if (fs.existsSync(p)) {
+      GlobalFonts.registerFromPath(p, name);
+      if (name === 'TrazoBold') boldFont = `bold 1px ${name}`;
+      if (name === 'TrazoReg')  regFont  = `1px ${name}`;
+      console.log('Font OK:', p);
+    }
+  } catch(e) {}
+});
 
 const OG_STEPS  = ['Preparando tu pedido','En camino','A punto de llegar','Entregado'];
 const OG_COLORS = ['#C9871E','#FF5A36','#FF5A36','#1F9D6F'];
 const ogCache   = new Map();
 
-function fillRect(ctx, x, y, w, h, color) {
-  ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
-}
-
-app.get('/og-image/:code', async (req, res) => {
+app.get('/og-image/:code', (req, res) => {
   const code = req.params.code;
   if (ogCache.has(code)) {
     const { buf, ts } = ogCache.get(code);
@@ -231,104 +225,88 @@ app.get('/og-image/:code', async (req, res) => {
     }
   }
 
-  const s          = Object.values(db.shipments).find(x => x.tracking === code);
-  const product    = s ? (s.product.length>38 ? s.product.substring(0,38)+'…' : s.product) : 'Tu pedido';
-  const step       = s ? (OG_STEPS[s.currentStep]  || 'En proceso')   : 'Seguimiento en vivo';
-  const stepColor  = s ? (OG_COLORS[s.currentStep] || '#FF5A36')       : '#FF5A36';
-  const recipient  = s ? s.recipient : '';
-  const dest       = s && s.destName ? s.destName.split(',')[0] : '';
-  const bold       = ogFontsLoaded ? 'bold 1px "OGBold"' : 'bold 1px sans-serif';
-  const reg        = ogFontsLoaded ? '1px "OGReg"'       : '1px sans-serif';
+  const s         = Object.values(db.shipments).find(x => x.tracking === code);
+  const product   = s ? (s.product.length>38 ? s.product.substring(0,38)+'…' : s.product) : 'Tu pedido';
+  const step      = s ? (OG_STEPS[s.currentStep]  || 'En proceso')  : 'Seguimiento en vivo';
+  const stepColor = s ? (OG_COLORS[s.currentStep] || '#FF5A36')      : '#FF5A36';
+  const recipient = s ? s.recipient : '';
+  const dest      = s && s.destName ? s.destName.split(',')[0] : '';
 
   try {
     const W = 1200, H = 630;
-    const img = pureimage.make(W, H);
-    const ctx = img.getContext('2d');
+    const canvas = createCanvas(W, H);
+    const ctx = canvas.getContext('2d');
 
-    // ── Fondo ──
-    fillRect(ctx, 0, 0, W, H, '#15182B');
+    // Fondo y banda superior oscura
+    ctx.fillStyle = '#15182B'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#0D0F1D'; ctx.fillRect(0,0,W,200);
+    // Franja naranja izquierda
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(0,0,12,H);
 
-    // ── Franja izquierda naranja ──
-    fillRect(ctx, 0, 0, 12, H, '#FF5A36');
-
-    // ── Banda superior oscura ──
-    fillRect(ctx, 0, 0, W, 200, '#0D0F1D');
-
-    // ── T grande (logo) ──
-    // Barra horizontal
-    fillRect(ctx, 60, 55, 140, 30, '#FF5A36');
-    // Barra vertical
-    fillRect(ctx, 110, 80, 30, 100, '#ffffff');
+    // T — barra horizontal
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(60,52,140,30);
+    // T — barra vertical
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(110,76,30,106);
     // Punto GPS
-    ctx.fillStyle = '#FF5A36';
-    ctx.beginPath(); ctx.arc(218, 172, 18, 0, Math.PI*2); ctx.fill();
-    // Punto GPS interior
-    ctx.fillStyle = '#0D0F1D';
-    ctx.beginPath(); ctx.arc(218, 172, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FF5A36'; ctx.beginPath(); ctx.arc(220,172,18,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0D0F1D'; ctx.beginPath(); ctx.arc(220,172,8,0,Math.PI*2);  ctx.fill();
 
-    // ── TRAZO wordmark ──
+    // Wordmark TRAZO
     ctx.fillStyle = '#ffffff';
-    ctx.font = bold.replace('1px', '88px');
-    ctx.fillText('TRAZO', 260, 158);
-
-    // ── Línea naranja bajo wordmark ──
-    fillRect(ctx, 260, 168, 390, 6, '#FF5A36');
-
-    // ── "Delivery en tiempo real" ──
+    ctx.font = boldFont.replace('1px','88px');
+    ctx.fillText('TRAZO', 258, 160);
+    // Underline naranja
+    ctx.fillStyle = '#FF5A36'; ctx.fillRect(258,170,390,6);
+    // Subtítulo
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = reg.replace('1px', '22px');
-    ctx.fillText('DELIVERY EN TIEMPO REAL', 262, 196);
+    ctx.font = regFont.replace('1px','22px');
+    ctx.fillText('DELIVERY EN TIEMPO REAL', 260, 196);
 
-    // ── Separador ──
-    fillRect(ctx, 60, 210, W-120, 1, 'rgba(255,255,255,0.08)');
+    // Divider
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(60,210,W-120,1);
 
-    // ── Nombre del pedido ──
+    // Nombre del pedido
     ctx.fillStyle = '#ffffff';
-    ctx.font = bold.replace('1px', '48px');
+    ctx.font = boldFont.replace('1px','48px');
     ctx.fillText(product, 60, 295);
 
-    // ── Badge estado ──
-    const badgeW = Math.min(step.length * 18 + 60, 680);
-    fillRect(ctx, 60, 318, badgeW, 56, stepColor);
+    // Badge estado
+    ctx.fillStyle = stepColor;
+    ctx.beginPath();
+    ctx.roundRect(60, 316, Math.min(step.length*19+60, 680), 56, 28);
+    ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = bold.replace('1px', '28px');
-    ctx.fillText(step, 84, 356);
+    ctx.font = boldFont.replace('1px','28px');
+    ctx.fillText(step, 88, 354);
 
-    // ── Destinatario ──
+    // Destinatario
     if (recipient) {
       ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.font = reg.replace('1px', '28px');
-      const recLine = ('Para: ' + recipient + (dest ? '  ·  ' + dest : '')).substring(0, 58);
-      ctx.fillText(recLine, 60, 425);
+      ctx.font = regFont.replace('1px','28px');
+      const line = ('Para: '+recipient+(dest?' · '+dest:'')).substring(0,56);
+      ctx.fillText(line, 60, 428);
     }
 
-    // ── Código ──
+    // Código
     ctx.fillStyle = '#FF5A36';
-    ctx.font = reg.replace('1px', '24px');
-    ctx.fillText('Código: ' + code, 60, 472);
+    ctx.font = regFont.replace('1px','24px');
+    ctx.fillText('Código: '+code, 60, 474);
 
-    // ── Footer ──
-    fillRect(ctx, 0, H-64, W, 64, 'rgba(0,0,0,0.4)');
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = reg.replace('1px', '21px');
+    // Footer
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0,H-64,W,64);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = regFont.replace('1px','21px');
     ctx.textAlign = 'center';
-    ctx.fillText('Tocá para ver el seguimiento GPS en vivo  ·  trazo-hbrf.onrender.com', W/2, H-24);
+    ctx.fillText('Tocá para ver el seguimiento GPS en vivo  ·  trazo-hbrf.onrender.com', W/2, H-22);
 
-    const chunks = [];
-    const stream = new PassThrough();
-    stream.on('data', d => chunks.push(d));
-    await new Promise((resolve, reject) => {
-      stream.on('end', resolve); stream.on('error', reject);
-      pureimage.encodePNGToStream(img, stream);
-    });
-    const buf = Buffer.concat(chunks);
+    const buf = canvas.toBuffer('image/png');
     ogCache.set(code, { buf, ts: Date.now() });
     res.setHeader('Content-Type','image/png');
     res.setHeader('Cache-Control','public, max-age=60');
     res.send(buf);
   } catch(e) {
     console.error('OG error:', e.message);
-    res.status(500).send('Error');
+    res.status(500).send('Error generando imagen');
   }
 });
 
