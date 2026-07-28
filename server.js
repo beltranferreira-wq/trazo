@@ -24,16 +24,19 @@ function save(db) {
 let db = load();
 if (!db.shipments) db.shipments = {};
 
+// 4 estados para delivery gastronómico:
+// 0: Preparando | 1: En camino | 2: A punto de llegar | 3: Entregado
+
 if (Object.keys(db.shipments).length === 0) {
   const now = new Date();
-  const d = n => new Date(now - n * 86400000).toISOString();
+  const m = n => new Date(now - n * 60000).toISOString();
   db.shipments = {
-    s1: { id:'s1', product:'Auriculares inalambricos Pro', emoji:'🎧', carrier:'ExpressLog', tracking:'EL3829471AR', recipient:'Julieta Fernandez', phone:'+5491155556789', originName:'Sucursal Centro - Florida 234, CABA', originLat:-34.6007, originLng:-58.3731, destName:'Av. Rivadavia 4521, CABA', destLat:-34.6217, destLng:-58.4341, currentStep:5, alert:null, courierLat:null, courierLng:null, courierActive:false, dates:[d(6),d(5),d(4),d(2),d(1),d(0)], createdAt:d(6) },
-    s2: { id:'s2', product:'Zapatillas running Aero 2', emoji:'👟', carrier:'Rauta Envios', tracking:'RT5512839AR', recipient:'Marcos Soria', phone:'+5491133334567', originName:'Deposito Palermo - Av. Santa Fe 3200, CABA', originLat:-34.5875, originLng:-58.4177, destName:'Mendoza 1150, Rosario', destLat:-32.9479, destLng:-60.6393, currentStep:3, alert:null, courierLat:-34.12, courierLng:-59.3, courierActive:false, dates:[d(3),d(2),d(1),d(0),null,null], createdAt:d(3) },
-    s3: { id:'s3', product:'Funda para tablet', emoji:'📱', carrier:'Correo Directo', tracking:'CD2207745AR', recipient:'Ana Gomez', phone:'+5491188880000', originName:'Centro Logistico La Plata', originLat:-34.9215, originLng:-57.9545, destName:'Calle 50 nro 800, La Plata', destLat:-34.917, destLng:-57.95, currentStep:2, alert:'Envio demorado en distribucion.', courierLat:null, courierLng:null, courierActive:false, dates:[d(4),d(3),d(2),null,null,null], createdAt:d(4) }
+    s1: { id:'s1', product:'Hamburguesa Doble + Papas', emoji:'🍔', carrier:'Juan Repartidor', tracking:'TRZ0001', recipient:'Carlos Gomez', phone:'+5491155550001', originName:'Local Centro — Av. Corrientes 1234', originLat:-34.6037, originLng:-58.3816, destName:'Thames 1850, Palermo', destLat:-34.5885, destLng:-58.4276, currentStep:3, alert:null, courierLat:-34.5920, courierLng:-58.4100, courierActive:false, dates:[m(35),m(20),m(8),m(2)], createdAt:m(35) },
+    s2: { id:'s2', product:'Combo Familiar x4 + Bebidas', emoji:'🍟', carrier:'Maria Repartidora', tracking:'TRZ0002', recipient:'Lucia Perez', phone:'+5491155550002', originName:'Local Centro — Av. Corrientes 1234', originLat:-34.6037, originLng:-58.3816, destName:'Santa Fe 3200, Recoleta', destLat:-34.5952, destLng:-58.3988, currentStep:1, alert:null, courierLat:-34.5990, courierLng:-58.3900, courierActive:false, dates:[m(15),m(5),null,null], createdAt:m(15) },
+    s3: { id:'s3', product:'BBQ Bacon + Cerveza', emoji:'🍺', carrier:'Pedro Repartidor', tracking:'TRZ0003', recipient:'Martin Torres', phone:'+5491155550003', originName:'Local Centro — Av. Corrientes 1234', originLat:-34.6037, originLng:-58.3816, destName:'Scalabrini Ortiz 2500, Villa Crespo', destLat:-34.5975, destLng:-58.4350, currentStep:0, alert:null, courierLat:null, courierLng:null, courierActive:false, dates:[m(3),null,null,null], createdAt:m(3) }
   };
   save(db);
-  console.log('DB inicializada con ejemplos.');
+  console.log('DB inicializada con pedidos de ejemplo.');
 }
 
 const rooms = new Map();
@@ -88,20 +91,38 @@ app.get('/api/track/:code', (req, res) => {
 app.post('/api/shipments', (req, res) => {
   const b = req.body;
   if (!b.product || !b.product.trim()) return res.status(400).json({ error:'Producto requerido' });
-  const emojis = ['📦','🧴','👕','🧢','📚','🖥️','🪴','🧸','🎒','⌚'];
+  const emojis = ['🍔','🍟','🌭','🍕','🥩','🧆','🥪','🍗','🥓','🧃','🥤','🍺','🍻','🛵','📦'];
   const id = uuidv4();
-  const tracking = (b.tracking||'').trim().toUpperCase() || ('TR'+Math.floor(Math.random()*9000000+1000000)+'AR');
+  const tracking = (b.tracking||'').trim().toUpperCase() || ('TRZ'+Math.floor(Math.random()*9000+1000));
   const now = new Date().toISOString();
-  const s = { id, tracking, product:b.product.trim(), emoji:emojis[Math.floor(Math.random()*emojis.length)], carrier:b.carrier||'Sin asignar', recipient:b.recipient||'Destinatario', phone:b.phone||'', originName:b.originName||'', originLat:parseFloat(b.originLat)||null, originLng:parseFloat(b.originLng)||null, destName:b.destName||'', destLat:parseFloat(b.destLat)||null, destLng:parseFloat(b.destLng)||null, currentStep:0, alert:null, courierLat:null, courierLng:null, courierActive:false, dates:[now,null,null,null,null,null], createdAt:now };
+  const s = {
+    id, tracking,
+    product: b.product.trim(),
+    emoji: emojis[Math.floor(Math.random()*emojis.length)],
+    carrier: b.carrier||'Repartidor',
+    recipient: b.recipient||'Cliente',
+    phone: b.phone||'',
+    originName: b.originName||'',
+    originLat: parseFloat(b.originLat)||null,
+    originLng: parseFloat(b.originLng)||null,
+    destName: b.destName||'',
+    destLat: parseFloat(b.destLat)||null,
+    destLng: parseFloat(b.destLng)||null,
+    currentStep: 0, alert: null,
+    courierLat: null, courierLng: null, courierActive: false,
+    dates: [now, null, null, null],
+    createdAt: now
+  };
   db.shipments[id] = s; save(db); res.status(201).json(s);
 });
 
 app.patch('/api/shipments/:id/advance', (req, res) => {
   const s = db.shipments[req.params.id];
   if (!s) return res.status(404).json({ error:'No encontrado' });
-  if (s.currentStep >= 5) return res.status(400).json({ error:'Ya entregado' });
-  s.currentStep++; s.dates[s.currentStep] = new Date().toISOString();
-  if (s.currentStep === 5) { s.alert = null; s.courierActive = false; }
+  if (s.currentStep >= 3) return res.status(400).json({ error:'Ya entregado' });
+  s.currentStep++;
+  s.dates[s.currentStep] = new Date().toISOString();
+  if (s.currentStep === 3) { s.alert = null; s.courierActive = false; }
   save(db); broadcast(s.tracking, { type:'state', shipment:s }); res.json(s);
 });
 
