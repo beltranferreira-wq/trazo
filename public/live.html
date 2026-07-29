@@ -152,34 +152,27 @@ if (!code) { showInvalid(); }
 var lastMapUrl = '';
 
 function buildMapUrl(s) {
-  var origin = '';
-  var dest = '';
-  var waypoints = '';
+  // Use uMap/OpenStreetMap embed - no API key needed
+  var mlat, mlon, zoom = 13;
   
-  if (s.originLat && s.originLng) {
-    origin = s.originLat + ',' + s.originLng;
-  } else if (s.originName) {
-    origin = encodeURIComponent(s.originName);
-  }
-  
-  if (s.destLat && s.destLng) {
-    dest = s.destLat + ',' + s.destLng;
-  } else if (s.destName) {
-    dest = encodeURIComponent(s.destName);
-  }
-  
-  if (!origin || !dest) return null;
-  
-  // Use courier position as waypoint if available
+  // Center on courier if available, otherwise origin
   if (s.courierLat && s.courierLng) {
-    waypoints = '&waypoints=' + s.courierLat + ',' + s.courierLng;
+    mlat = s.courierLat; mlon = s.courierLng;
+  } else if (s.originLat && s.originLng) {
+    mlat = s.originLat; mlon = s.originLng;
+  } else {
+    return null;
   }
   
-  return 'https://www.google.com/maps/embed/v1/directions?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY' +
-    '&origin=' + origin +
-    '&destination=' + dest +
-    waypoints +
-    '&mode=driving';
+  // Build markers string for OSM
+  var markers = '';
+  if (s.originLat) markers += '&marker=' + s.originLat + '%2C' + s.originLng;
+  if (s.courierLat) markers += '&marker=' + s.courierLat + '%2C' + s.courierLng;
+  if (s.destLat) markers += '&marker=' + s.destLat + '%2C' + s.destLng;
+  
+  return 'https://www.openstreetmap.org/export/embed.html?bbox=' +
+    (mlon-0.05) + '%2C' + (mlat-0.05) + '%2C' + (mlon+0.05) + '%2C' + (mlat+0.05) +
+    '&layer=mapnik' + markers;
 }
 
 function initMap(s) {
