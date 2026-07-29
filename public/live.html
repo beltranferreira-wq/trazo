@@ -496,75 +496,70 @@ function fitAll(s) {
 }
 
 
-// ─── WebSocket ─────────────────────────────────────────────────────────────
-function connect() {
-  if (!code) return;
-  clearTimeout(reconnTimer);
-  
+// ─── HTTP Polling (reemplaza WebSocket para máxima compatibilidad) ────────────
+let pollTimer = null;
+let lastStep = null;
+let lastCourierLat = null;
+let mapInitialized = false;
+
+async function fetchState() {
   try {
-    const proto = location.protocol==='https:' ? 'wss' : 'ws';
-    const wsUrl = `${proto}://${location.host}`;
-    console.log('Conectando WebSocket a:', wsUrl);
-    ws = new WebSocket(wsUrl);
+    const r = await fetch(`/api/track/${encodeURIComponent(code)}`);
+    if (!r.ok) { showInvalid(); return; }
+    const s = await r.json();
     
-    ws.onopen = () => {
-      console.log('WebSocket conectado OK');
-      const sub = document.getElementById('topSub');
-      if (sub) sub.textContent = 'Trazo · Seguimiento en vivo';
-      ws.send(JSON.stringify({type:'join', code}));
-    };
-
-  ws.onmessage = e => {
-    let msg; try { msg=JSON.parse(e.data); } catch { return; }
-
-    if (msg.type==='error') { showInvalid(); return; }
-
-    if (msg.type==='state') {
-      const first = !shipment;
-      shipment = msg.shipment;
-      showSheet(shipment);
-      if (first) {
-        initMap(shipment);
-      } else {
-        if (shipment.courierLat) placeCourier(shipment.courierLat, shipment.courierLng, false);
-        fitAll(shipment);
-      }
-    }
-
-    if (msg.type==='position') {
-      if (!shipment) return;
-      shipment.courierLat       = msg.lat;
-      shipment.courierLng       = msg.lng;
-      shipment.courierActive    = true;
-      shipment.positionUpdatedAt= msg.updatedAt;
-      placeCourier(msg.lat, msg.lng, false);
-      updateStatus(shipment);
-      refreshETA();
-      // pan map gently to keep courier visible
-      if (liveMap && markers.courier) {
-        if (!liveMap.getBounds().contains(markers.courier.getLatLng())) {
-          liveMap.panTo(markers.courier.getLatLng(), {animate:true,duration:0.8});
+    // Init map only once
+    if (!mapInitialized) {
+      shipment = s;
+      showSheet(s);
+      initMap(s);
+      mapInitialized = true;
+    } else {
+      shipment = s;
+      // Update status if changed
+      updateStatus(s);
+      // Update courier position if changed
+      if (s.courierLat && s.courierLng &&
+          (s.courierLat !== lastCourierLat || s.courierLng !== lastCourierLat)) {
+        lastCourierLat = s.courierLat;
+        placeCourier(s.courierLat, s.courierLng, false);
+        if (liveMap && markers.courier) {
+          const b = liveMap.getBounds();
+          if (!b.contains(markers.courier.getLatLng())) {
+            liveMap.panTo(markers.courier.getLatLng(), {animate:true, duration:0.8});
+          }
         }
+        refreshETA();
       }
     }
+  } catch(e) {
+    console.log('Poll error:', e.message);
+  }
+}
 
-    if (msg.type==='courier_stop') {
-      if (!shipment) return;
-      shipment.courierActive = false;
-      updateStatus(shipment);
-    }
-  };
+async function sendPosition(lat, lng) {
+  try {
+    await fetch('/api/courier-position', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ code, lat, lng })
+    });
+  } catch(e) {}
+}
 
-  ws.onclose = (e) => {
-    console.log('WebSocket cerrado, código:', e.code, 'razón:', e.reason);
-    const sub = document.getElementById('topSub');
-    if (sub) sub.textContent = 'Reconectando...';
-    reconnTimer = setTimeout(connect, 3000);
-  };
-  ws.onerror = (e) => {
-    console.error('WebSocket error:', e);
-    ws.close();
-  };
+async function sendStop() {
+  try {
+    await fetch('/api/courier-stop', {
+      method: 'POST', 
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ code })
+    });
+  } catch(e) {}
+}
+
+function startPolling() {
+  fetchState();
+  pollTimer = setInterval(fetchState, 3000);
 }
 
 // ─── Courier GPS ───────────────────────────────────────────────────────────
@@ -601,9 +596,7 @@ function startGPS() {
       const now = Date.now();
       if (now-lastSend < 3000) return;
       lastSend = now;
-      if (ws && ws.readyState===WebSocket.OPEN) {
-        ws.send(JSON.stringify({type:'position', code, lat, lng, accuracy}));
-      }
+      sendPosition(lat, lng);
 
       // Button state
       if (!courierSharing) {
@@ -628,9 +621,7 @@ function startGPS() {
 function stopGPS() {
   if (watchId!==null) { navigator.geolocation.clearWatch(watchId); watchId=null; }
   courierSharing=false;
-  if (ws && ws.readyState===WebSocket.OPEN) {
-    ws.send(JSON.stringify({type:'courier_stop', code}));
-  }
+  sendStop();
   if (shipment) { shipment.courierActive=false; updateStatus(shipment); }
   courierBtn.classList.remove('sharing');
   courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 🛵 Soy el repartidor — Activar GPS`;
@@ -642,7 +633,7 @@ window.addEventListener('pagehide', stopGPS);
 window.addEventListener('resize', ()=>{ if(liveMap) liveMap.invalidateSize(); });
 
 // ─── Start ─────────────────────────────────────────────────────────────────
-if (code) connect();
+if (code) startPolling();
 
 // Show fallback message if map tiles don't load after 5s
 setTimeout(() => {
