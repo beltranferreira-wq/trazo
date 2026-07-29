@@ -1018,29 +1018,36 @@ function initDetailMap(s) {
   const el = document.getElementById('detailMap');
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
   try {
-    detailMap = L.map(el, { scrollWheelZoom:false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      { maxZoom:19, attribution:'© <a href="https://carto.com">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
-    ).addTo(detailMap);
-
-    const mkOr = L.divIcon({className:'',html:'<div class="pin-or"></div>',iconSize:[12,12],iconAnchor:[6,6]});
-    const mkDt = L.divIcon({className:'',html:'<div class="pin-dt"></div>',iconSize:[14,14],iconAnchor:[7,7]});
-    const mkCr = L.divIcon({className:'',html:'<div class="pin-cw"><div class="pin-pulse"></div><div class="pin-c"></div></div>',iconSize:[22,22],iconAnchor:[11,11]});
-
-    detailMarkers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(detailMap).bindPopup(s.originName||'Origen');
-    detailMarkers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(detailMap).bindPopup(s.destName||'Destino');
-
-    L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],
-      {color:'#C0C5D0',weight:3,dashArray:'2 8'}).addTo(detailMap);
-
-    if (s.courierLat && s.courierLng) {
-      detailMarkers.courier = L.marker([s.courierLat,s.courierLng],{icon:mkCr}).addTo(detailMap).bindPopup('Transportista');
-      L.polyline([[s.originLat,s.originLng],[s.courierLat,s.courierLng]],
-        {color:s.alert?'#D14343':'#1F9D6F',weight:4}).addTo(detailMap);
+    const center = s.originLat ? {lat:s.originLat,lng:s.originLng} : {lat:-34.6037,lng:-58.3816};
+    detailMap = new google.maps.Map(el, {
+      center, zoom:13,
+      disableDefaultUI:false, zoomControl:true, streetViewControl:false,
+      fullscreenControl:false, mapTypeControl:false,
+      styles:[
+        {elementType:'geometry',stylers:[{color:'#f5f5f5'}]},
+        {featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},
+        {featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#e0e0e0'}]},
+        {featureType:'poi',stylers:[{visibility:'off'}]},
+        {featureType:'water',elementType:'geometry',stylers:[{color:'#c9c9c9'}]}
+      ]
+    });
+    if (s.originLat) {
+      detailMarkers.origin = new google.maps.Marker({map:detailMap,position:{lat:s.originLat,lng:s.originLng},title:s.originName||'Origen',icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#9AA3B2',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
     }
-
-    detailMap.fitBounds(L.latLngBounds([[s.originLat,s.originLng],[s.destLat,s.destLng]]),{padding:[30,30]});
-    setTimeout(()=>{if(detailMap)detailMap.invalidateSize();},250);
+    if (s.destLat) {
+      detailMarkers.dest = new google.maps.Marker({map:detailMap,position:{lat:s.destLat,lng:s.destLng},title:s.destName||'Destino',icon:{path:google.maps.SymbolPath.CIRCLE,scale:9,fillColor:'#15182B',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}});
+    }
+    if (s.originLat && s.destLat) {
+      new google.maps.Polyline({map:detailMap,path:[{lat:s.originLat,lng:s.originLng},{lat:s.destLat,lng:s.destLng}],strokeColor:'#C0C5D0',strokeWeight:3,strokeOpacity:0.7});
+    }
+    if (s.courierLat && s.courierLng) {
+      detailMarkers.courier = new google.maps.Marker({map:detailMap,position:{lat:s.courierLat,lng:s.courierLng},title:'Repartidor',icon:{path:google.maps.SymbolPath.CIRCLE,scale:10,fillColor:'#FF5A36',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
+      new google.maps.Polyline({map:detailMap,path:[{lat:s.originLat,lng:s.originLng},{lat:s.courierLat,lng:s.courierLng}],strokeColor:s.alert?'#D14343':'#1F9D6F',strokeWeight:4});
+    }
+    const bounds = new google.maps.LatLngBounds();
+    if (s.originLat) bounds.extend({lat:s.originLat,lng:s.originLng});
+    if (s.destLat)   bounds.extend({lat:s.destLat,lng:s.destLng});
+    detailMap.fitBounds(bounds, {top:30,right:30,bottom:30,left:30});
   } catch(e) { console.error('Map error:',e); }
 }
 
