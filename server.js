@@ -269,6 +269,28 @@ app.get('/og-image/:code', async (req, res) => {
   } catch(e) { console.error('OG error:',e.message); res.status(500).send('Error'); }
 });
 
+
+// ─── HTTP endpoints para polling (alternativa a WebSocket) ─────────────────
+app.post('/api/courier-position', async (req, res) => {
+  const { code, lat, lng } = req.body;
+  if (!code || !lat || !lng) return res.status(400).json({ error:'Faltan datos' });
+  await pool.query(
+    'UPDATE shipments SET courier_lat=$1,courier_lng=$2,courier_active=TRUE,position_updated_at=NOW() WHERE tracking=$3',
+    [lat, lng, code]
+  );
+  // Also broadcast via WebSocket if anyone connected
+  broadcast(code, { type:'position', lat, lng, updatedAt:new Date().toISOString() });
+  res.json({ ok:true });
+});
+
+app.post('/api/courier-stop', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error:'Falta código' });
+  await pool.query('UPDATE shipments SET courier_active=FALSE WHERE tracking=$1', [code]);
+  broadcast(code, { type:'courier_stop' });
+  res.json({ ok:true });
+});
+
 app.get('/health', (req, res) => res.json({ status:'ok' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
