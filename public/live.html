@@ -132,6 +132,57 @@ var watchId = null;
 var lastSend = 0;
 var toastTimer;
 
+// ── Sonido de notificación ───────────────────────────────────────────────────
+var lastStep = -1;
+var audioCtx = null;
+
+function playNotification(type) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    var freqs = type === 'delivered' ? [523, 659, 784, 1047] // Do Mi Sol Do - entregado
+              : type === 'moving'    ? [440, 554, 659]        // La Do# Mi - en camino
+              : [440, 440];                                    // beep simple
+    
+    var time = audioCtx.currentTime;
+    freqs.forEach(function(freq, i) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, time + i * 0.18);
+      gain.gain.setValueAtTime(0.4, time + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + i * 0.18 + 0.3);
+      osc.start(time + i * 0.18);
+      osc.stop(time + i * 0.18 + 0.35);
+    });
+  } catch(e) {
+    console.log('Audio not available:', e.message);
+  }
+}
+
+function checkStepChange(s) {
+  if (lastStep === -1) { lastStep = s.currentStep; return; }
+  if (s.currentStep !== lastStep) {
+    lastStep = s.currentStep;
+    var type = s.currentStep === 2 ? 'delivered'
+             : s.currentStep === 1 ? 'moving' : 'update';
+    playNotification(type);
+    // Try browser notification too
+    if ('Notification' in window && Notification.permission === 'granted') {
+      var msgs = ['🍔 Tu pedido está en preparación', '🛵 Tu pedido está en camino', '✅ ¡Tu pedido fue entregado!'];
+      try { new Notification('TRAZO', { body: msgs[s.currentStep] || 'Estado actualizado', icon: '/icons/icon-192.png' }); } catch(e) {}
+    }
+  }
+}
+
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
 function toast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -231,7 +282,7 @@ function updateETA(s) {
 }
 
 // ── UI ───────────────────────────────────────────────────────────────────────
-var STEPS = ['🍔 Preparando tu pedido','🛵 En camino','📍 A punto de llegar','✅ Entregado'];
+var STEPS = ['🍔 En preparación','🛵 En camino','✅ Entregado'];
 
 function updateUI(s) {
   document.getElementById('topProduct').textContent = s.product;
@@ -282,6 +333,7 @@ function updateUI(s) {
   }
 
   updateETA(s);
+  checkStepChange(s);
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
@@ -361,6 +413,7 @@ window.addEventListener('beforeunload', stopGPS);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 if (code) {
+  requestNotifPermission();
   fetchState();
   pollTimer = setInterval(fetchState, 3000);
 }
