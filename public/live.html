@@ -658,7 +658,18 @@ function connect() {
     }
   };
 
-  ws.onclose = () => { reconnTimer = setTimeout(connect, 4000); };
+  let reconnAttempts = 0;
+  ws.onclose = () => {
+    reconnAttempts++;
+    const delay = Math.min(reconnAttempts * 2000, 10000); // 2s, 4s, 6s... max 10s
+    console.log(`Reconectando en ${delay/1000}s... (intento ${reconnAttempts})`);
+    if (reconnAttempts === 1) {
+      // Show reconnecting message
+      const sub = document.getElementById('topSub');
+      if (sub) sub.textContent = 'Reconectando...';
+    }
+    reconnTimer = setTimeout(() => { reconnAttempts = 0; connect(); }, delay);
+  };
   ws.onerror = () => ws.close();
 }
 
