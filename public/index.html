@@ -653,7 +653,7 @@ img,svg{display:block;}
   <p class="modal-sub">Ingresá los datos del pedido para compartir el seguimiento en vivo con el cliente.</p>
 
   <div class="fsec">Producto</div>
-  <div class="fg"><label>Nombre del producto *</label><input id="f-prod" placeholder="Ej: Mochila urbana 25L" autocomplete="off"></div>
+  <div class="fg"><label>Nombre del producto *</label><input id="f-prod" placeholder="Ej: Hamburguesa Doble + Papas" autocomplete="off" value="KING RESTO-BAR"></div>
   <div class="frow">
     <div class="fg"><label>Transportista</label><input id="f-car" placeholder="Ej: ExpressLog"></div>
     <div class="fg"><label>Código de envío</label><input id="f-code" placeholder="Auto si vacío"></div>
@@ -665,10 +665,10 @@ img,svg{display:block;}
   </div>
 
   <div class="fsec">Punto de origen</div>
-  <div class="fg"><label>Nombre del local / depósito *</label><input id="f-oname" placeholder="Ej: Sucursal Centro — Florida 234"></div>
+  <div class="fg"><label>Nombre del local / depósito *</label><input id="f-oname" placeholder="Ej: Local — Dirección" value="KING RESTO-BAR — Esquel 1399, Ezpeleta"></div>
   <div class="frow">
-    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..."></div>
-    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..."></div>
+    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.7456"></div>
+    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.2218"></div>
   </div>
   <p style="font-size:11px;color:var(--muted);margin:-8px 0 8px;padding:0 2px;">💡 Las coordenadas mejoran el mapa. Podés usar el botón de abajo o dejarlas vacías — el sistema las busca automáticamente por la dirección.</p>
       <button class="btn-geo" id="geoBtn">
@@ -694,6 +694,11 @@ img,svg{display:block;}
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+</head>
+<body>
+<!-- TEMP FIX -->
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
 
@@ -766,7 +771,7 @@ let detailMap = null;
 let detailMarkers = {};
 let toastTimer;
 
-const STEPS = ['🍔 Preparando tu pedido','🛵 En camino','📍 A punto de llegar','✅ Entregado'];
+const STEPS = ['🍔 En preparación','🛵 En camino','✅ Entregado'];
 
 // ─── Toast ────────────────────────────────────────────────────────────────
 function toast(msg) {
@@ -795,10 +800,9 @@ function fmtDate(iso) {
 }
 function badge(s) {
   if (s.alert) return { t:'⚠️ Demorado', c:'b-warn' };
-  if (s.currentStep===3) return { t:'✅ Entregado', c:'b-success' };
-  if (s.currentStep===2) return { t:'📍 A punto de llegar', c:'b-accent' };
+  if (s.currentStep===2) return { t:'✅ Entregado', c:'b-success' };
   if (s.currentStep===1) return { t:'🛵 En camino', c:'b-accent' };
-  return { t:'🍔 Preparando', c:'b-amber' };
+  return { t:'🍔 En preparación', c:'b-amber' };
 }
 function waUrlCourier(s) {
   const live = `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
@@ -945,8 +949,8 @@ function renderDetail(s) {
     ? `<div class="alert-box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>${s.alert}</div>` : '';
 
   const advHtml = s.currentStep < 5
-    ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
-    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
+    ? (s.currentStep < 2 ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
+    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>` : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
 
   document.getElementById('detailContent').innerHTML = `
     <div class="dcard-top">
@@ -1018,36 +1022,27 @@ function initDetailMap(s) {
   const el = document.getElementById('detailMap');
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
   try {
-    const center = s.originLat ? {lat:s.originLat,lng:s.originLng} : {lat:-34.6037,lng:-58.3816};
-    detailMap = new google.maps.Map(el, {
-      center, zoom:13,
-      disableDefaultUI:false, zoomControl:true, streetViewControl:false,
-      fullscreenControl:false, mapTypeControl:false,
-      styles:[
-        {elementType:'geometry',stylers:[{color:'#f5f5f5'}]},
-        {featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},
-        {featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#e0e0e0'}]},
-        {featureType:'poi',stylers:[{visibility:'off'}]},
-        {featureType:'water',elementType:'geometry',stylers:[{color:'#c9c9c9'}]}
-      ]
-    });
-    if (s.originLat) {
-      detailMarkers.origin = new google.maps.Marker({map:detailMap,position:{lat:s.originLat,lng:s.originLng},title:s.originName||'Origen',icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#9AA3B2',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
-    }
-    if (s.destLat) {
-      detailMarkers.dest = new google.maps.Marker({map:detailMap,position:{lat:s.destLat,lng:s.destLng},title:s.destName||'Destino',icon:{path:google.maps.SymbolPath.CIRCLE,scale:9,fillColor:'#15182B',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}});
-    }
-    if (s.originLat && s.destLat) {
-      new google.maps.Polyline({map:detailMap,path:[{lat:s.originLat,lng:s.originLng},{lat:s.destLat,lng:s.destLng}],strokeColor:'#C0C5D0',strokeWeight:3,strokeOpacity:0.7});
-    }
+    if (typeof L === 'undefined') return;
+    detailMap = L.map(el, { scrollWheelZoom:false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      { maxZoom:19, attribution:'© <a href="https://carto.com">CARTO</a>' }
+    ).addTo(detailMap);
+    const mkOr = L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>',iconSize:[12,12],iconAnchor:[6,6]});
+    const mkDt = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+    const mkCr = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#FF5A36;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+    if (s.originLat) detailMarkers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(detailMap).bindPopup(s.originName||'Origen');
+    if (s.destLat)   detailMarkers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(detailMap).bindPopup(s.destName||'Destino');
+    if (s.originLat && s.destLat) L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'2 8'}).addTo(detailMap);
     if (s.courierLat && s.courierLng) {
-      detailMarkers.courier = new google.maps.Marker({map:detailMap,position:{lat:s.courierLat,lng:s.courierLng},title:'Repartidor',icon:{path:google.maps.SymbolPath.CIRCLE,scale:10,fillColor:'#FF5A36',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
-      new google.maps.Polyline({map:detailMap,path:[{lat:s.originLat,lng:s.originLng},{lat:s.courierLat,lng:s.courierLng}],strokeColor:s.alert?'#D14343':'#1F9D6F',strokeWeight:4});
+      detailMarkers.courier = L.marker([s.courierLat,s.courierLng],{icon:mkCr}).addTo(detailMap).bindPopup('Repartidor');
+      L.polyline([[s.originLat,s.originLng],[s.courierLat,s.courierLng]],{color:s.alert?'#D14343':'#1F9D6F',weight:4}).addTo(detailMap);
     }
-    const bounds = new google.maps.LatLngBounds();
-    if (s.originLat) bounds.extend({lat:s.originLat,lng:s.originLng});
-    if (s.destLat)   bounds.extend({lat:s.destLat,lng:s.destLng});
-    detailMap.fitBounds(bounds, {top:30,right:30,bottom:30,left:30});
+    const pts=[];
+    if(s.originLat) pts.push([s.originLat,s.originLng]);
+    if(s.destLat) pts.push([s.destLat,s.destLng]);
+    if(pts.length>=2) detailMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});
+    else if(pts.length===1) detailMap.setView(pts[0],14);
+    setTimeout(()=>{if(detailMap)detailMap.invalidateSize();},250);
   } catch(e) { console.error('Map error:',e); }
 }
 
@@ -1142,8 +1137,13 @@ function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
   document.getElementById('modalSheet').classList.remove('open');
   document.body.style.overflow='';
-  ['f-prod','f-car','f-code','f-rec','f-phone','f-courier-phone','f-oname','f-olat','f-olng','f-dname','f-dlat','f-dlng']
+  ['f-code','f-rec','f-phone','f-courier-phone','f-dname','f-dlat','f-dlng']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Restore defaults for local fields
+  const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
+  const dn = document.getElementById('f-oname'); if(dn) dn.value='KING RESTO-BAR — Esquel 1399, Ezpeleta';
+  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.7456';
+  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.2218';
 }
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
