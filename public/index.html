@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#15182B">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -842,13 +845,48 @@ const api = {
 
 // ─── Load shipments ───────────────────────────────────────────────────────
 async function loadAll() {
-  try {
-    shipments = await api.get('/api/shipments');
-  } catch(e) {
-    toast('Sin conexión — mostrando caché');
-    shipments = [];
+  const meta = document.getElementById('listMeta');
+  const cards = document.getElementById('scards');
+  if (meta) meta.textContent = 'Conectando...';
+  if (cards) cards.innerHTML = `<div class="empty-state" style="padding-top:60px;">
+    <div style="font-size:36px;margin-bottom:12px;animation:spin 2s linear infinite;">⏳</div>
+    <h2>Iniciando servidor...</h2>
+    <p style="font-size:13px;">El servidor puede tardar hasta 50 segundos en despertar.<br>Esperá un momento...</p>
+  </div>`;
+  
+  // Try up to 3 times with increasing waits
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000); // 20s each attempt
+      const r = await fetch('/api/shipments?t=' + Date.now(), { 
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(timeout);
+      if (!r.ok) throw new Error('Error ' + r.status);
+      shipments = await r.json();
+      renderList();
+      return;
+    } catch(e) {
+      if (attempt < 3) {
+        if (cards) cards.innerHTML = `<div class="empty-state" style="padding-top:60px;">
+          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+          <h2>Iniciando... (${attempt}/3)</h2>
+          <p style="font-size:13px;">El servidor está despertando, aguantá un poco más...</p>
+        </div>`;
+        await new Promise(r => setTimeout(r, 5000)); // wait 5s between attempts
+      } else {
+        shipments = [];
+        if (cards) cards.innerHTML = `<div class="empty-state">
+          <h2>Sin conexión</h2>
+          <p>No se pudo conectar al servidor.</p>
+          <button class="empty-cta" onclick="loadAll()">🔄 Reintentar</button>
+        </div>`;
+        if (meta) meta.textContent = 'Sin conexión';
+      }
+    }
   }
-  renderList();
 }
 
 // ─── Render list ──────────────────────────────────────────────────────────
@@ -1283,6 +1321,7 @@ if (new URLSearchParams(location.search).get('action') === 'new') {
 applyLayout();
 loadAll();
 renderNotifs();
+
 </script>
 </body>
 </html>
