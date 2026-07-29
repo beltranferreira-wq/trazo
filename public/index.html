@@ -1019,8 +1019,8 @@ function initDetailMap(s) {
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
   try {
     detailMap = L.map(el, { scrollWheelZoom:false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { maxZoom:19, attribution:'© <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      { maxZoom:19, attribution:'© <a href="https://carto.com">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
     ).addTo(detailMap);
 
     const mkOr = L.divIcon({className:'',html:'<div class="pin-or"></div>',iconSize:[12,12],iconAnchor:[6,6]});
