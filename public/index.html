@@ -665,7 +665,14 @@ img,svg{display:block;}
   </div>
 
   <div class="fsec">Punto de origen</div>
-  <div class="fg"><label>Nombre del local / depósito *</label><input id="f-oname" placeholder="Ej: Local — Dirección" value="KING RESTO-BAR — Esquel 1399, Ezpeleta"></div>
+  <div class="fg">
+    <label>Sucursal de despacho *</label>
+    <select id="f-branch" style="width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;font-size:15px;color:var(--ink);background:var(--surface);-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\'><path fill=\' %236B7180\' d=\'M7 10l5 5 5-5z\'/></svg>');background-repeat:no-repeat;background-position:right 12px center;">
+      <option value="esquel">📍 Esquel 1399, Ezpeleta</option>
+      <option value="quilmes">📍 Triunvirato 661, Quilmes</option>
+    </select>
+    <input type="hidden" id="f-oname" value="KING RESTO-BAR — Esquel 1399, Ezpeleta">
+  </div>
   <div class="frow">
     <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.7456"></div>
     <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.2218"></div>
@@ -712,9 +719,12 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
-  if (!localStorage.getItem('installDismissed')) {
-    document.getElementById('installBanner').classList.add('show');
-  }
+  // Always show install banner (don't check dismissed state)
+  document.getElementById('installBanner').classList.add('show');
+});
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').classList.remove('show');
+  deferredPrompt = null;
 });
 document.getElementById('installBtn').onclick = async () => {
   if (!deferredPrompt) return;
@@ -1141,6 +1151,7 @@ function closeModal() {
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   // Restore defaults for local fields
   const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
+  const dbr = document.getElementById('f-branch'); if(dbr) dbr.value='esquel';
   const dn = document.getElementById('f-oname'); if(dn) dn.value='KING RESTO-BAR — Esquel 1399, Ezpeleta';
   const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.7456';
   const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.2218';
@@ -1191,6 +1202,29 @@ document.getElementById('f-dname').addEventListener('input', (e) => {
   if (statusEl) statusEl.textContent = '';
   geoTimerDest = setTimeout(() => geocodeAddress(val, 'f-dlat', 'f-dlng', 'geo-status-dest'), 900);
 });
+
+
+// ─── Branch selector ──────────────────────────────────────────────────────────
+var BRANCHES = {
+  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.7456', lng:'-58.2218' },
+  quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
+};
+document.getElementById('f-branch').addEventListener('change', function() {
+  var b = BRANCHES[this.value];
+  if (!b) return;
+  document.getElementById('f-oname').value = b.name;
+  document.getElementById('f-olat').value  = b.lat;
+  document.getElementById('f-olng').value  = b.lng;
+  var st = document.getElementById('geo-status-origin');
+  if (st) { st.textContent = '✅ ' + b.name; st.style.color = 'var(--success)'; }
+});
+// Init on load
+(function(){
+  var b = BRANCHES['esquel'];
+  document.getElementById('f-oname').value = b.name;
+  document.getElementById('f-olat').value  = b.lat;
+  document.getElementById('f-olng').value  = b.lng;
+})();
 
 document.getElementById('geoBtn').onclick = () => {
   if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
