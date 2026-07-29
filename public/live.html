@@ -67,7 +67,7 @@ a{text-decoration:none;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
 
 /* ── MAP ── */
-#liveMap{flex:1;min-height:0;background:var(--dark2);}
+#liveMap{flex:1;min-height:0;background:var(--dark2);position:relative;}
 
 /* ── BOTTOM SHEET ── */
 .sheet{
@@ -216,7 +216,12 @@ a{text-decoration:none;}
 </div>
 
 <!-- MAP -->
-<div id="liveMap"></div>
+<div id="liveMap">
+  <div id="mapFallback" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:rgba(255,255,255,0.5);z-index:999;pointer-events:none;">
+    <div style="font-size:32px;margin-bottom:8px;">🗺️</div>
+    <div style="font-size:13px;">Cargando mapa...</div>
+  </div>
+</div>
 
 <!-- BOTTOM SHEET -->
 <div class="sheet" id="sheet" style="display:none">
@@ -413,9 +418,22 @@ async function initMap(s) {
 
   try {
     liveMap = L.map(el, { zoomControl:false, attributionControl:true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { maxZoom:19, attribution:'© <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
-    ).addTo(liveMap);
+    // Try multiple tile providers for reliability
+    const tileLayers = [
+      { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>' },
+      { url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png', attr: '© OSM DE' },
+      { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '© <a href="https://carto.com">CARTO</a>' },
+    ];
+    let tileLoaded = false;
+    for (const t of tileLayers) {
+      if (tileLoaded) break;
+      try {
+        const layer = L.tileLayer(t.url, { maxZoom:19, attribution:t.attr, errorTileUrl:'', crossOrigin:true });
+        layer.on('tileload', () => { tileLoaded = true; });
+        layer.addTo(liveMap);
+        break;
+      } catch(e) { continue; }
+    }
     L.control.zoom({ position:'topright' }).addTo(liveMap);
 
     if (s.originLat && s.originLng) {
@@ -694,6 +712,12 @@ window.addEventListener('resize', ()=>{ if(liveMap) liveMap.invalidateSize(); })
 
 // ─── Start ─────────────────────────────────────────────────────────────────
 if (code) connect();
+
+// Show fallback message if map tiles don't load after 5s
+setTimeout(() => {
+  const fb = document.getElementById('mapFallback');
+  if (fb && !liveMap) { fb.style.display = 'block'; }
+}, 5000);
 </script>
 </body>
 </html>
