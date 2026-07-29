@@ -297,7 +297,8 @@ a{text-decoration:none;}
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY"></script>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
 
@@ -394,140 +395,96 @@ function showInvalid() {
 if (!code) { showInvalid(); }
 
 // ─── Map ───────────────────────────────────────────────────────────────────
-// ─── Google Maps ─────────────────────────────────────────────────────────
-let gMap = null;
-let gMarkers = {};
-let gLines = [];
+// ─── Leaflet Map ────────────────────────────────────────────────────────────
+let liveMap = null;
+let markers = {};
+let routeLines = [];
+
+async function geocode(address) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Argentina')}&limit=1`, {headers:{'Accept-Language':'es','User-Agent':'Trazo/1.0'}});
+    const d = await r.json();
+    if (d && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+  } catch(e) {}
+  return null;
+}
 
 async function initMap(s) {
   const el = document.getElementById('liveMap');
-  const mapFb = document.getElementById('mapFallback');
-  if (mapFb) mapFb.style.display = 'none';
-  
+  const fb = document.getElementById('mapFallback');
+  if (!el) return;
+
+  // Geocode if missing coords
+  if ((!s.originLat || !s.originLng) && s.originName) {
+    const c = await geocode(s.originName);
+    if (c) { s.originLat = c.lat; s.originLng = c.lng; }
+  }
+  if ((!s.destLat || !s.destLng) && s.destName) {
+    const c = await geocode(s.destName);
+    if (c) { s.destLat = c.lat; s.destLng = c.lng; }
+  }
+
   try {
-    const center = s.courierLat
-      ? { lat: s.courierLat, lng: s.courierLng }
-      : s.originLat
-        ? { lat: s.originLat, lng: s.originLng }
-        : { lat: -34.6037, lng: -58.3816 };
+    if (typeof L === 'undefined') throw new Error('Leaflet no cargado');
+    
+    const center = s.courierLat ? [s.courierLat, s.courierLng]
+      : s.originLat ? [s.originLat, s.originLng]
+      : [-34.6037, -58.3816];
 
-    gMap = new google.maps.Map(el, {
-      center,
-      zoom: 13,
-      mapTypeId: 'roadmap',
-      disableDefaultUI: false,
-      zoomControl: true,
-      streetViewControl: false,
-      fullscreenControl: false,
-      mapTypeControl: false,
-      styles: [
-        { elementType: 'geometry', stylers: [{ color: '#1d2033' }] },
-        { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
-        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
-        { featureType: 'poi', stylers: [{ visibility: 'off' }] }
-      ]
-    });
+    liveMap = L.map(el, { zoomControl: true, attributionControl: true });
+    
+    // CARTO dark tiles (muy confiables en Argentina)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '© <a href="https://carto.com">CARTO</a>'
+    }).addTo(liveMap);
 
-    if (s.originLat) {
-      gMarkers.origin = new google.maps.Marker({
-        map: gMap,
-        position: { lat: s.originLat, lng: s.originLng },
-        title: s.originName || 'Origen',
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#9AA3B2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
-      });
-    }
-    if (s.destLat) {
-      gMarkers.dest = new google.maps.Marker({
-        map: gMap,
-        position: { lat: s.destLat, lng: s.destLng },
-        title: s.destName || 'Destino',
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#15182B', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 }
-      });
-    }
+    const mkOr = L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);"></div>',iconSize:[12,12],iconAnchor:[6,6]});
+    const mkDt = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+
+    if (s.originLat) markers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(liveMap).bindPopup(s.originName||'Origen');
+    if (s.destLat)   markers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(liveMap).bindPopup(s.destName||'Destino');
     if (s.originLat && s.destLat) {
-      new google.maps.Polyline({
-        map: gMap,
-        path: [{ lat: s.originLat, lng: s.originLng }, { lat: s.destLat, lng: s.destLng }],
-        strokeColor: 'rgba(255,255,255,0.2)',
-        strokeWeight: 3,
-        strokeOpacity: 1,
-        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 }, offset: '0', repeat: '20px' }]
-      });
+      L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'rgba(255,255,255,0.2)',weight:3,dashArray:'4 8'}).addTo(liveMap);
     }
-    if (s.courierLat) {
-      placeCourier(s.courierLat, s.courierLng, true);
-    }
+    if (s.courierLat) placeCourier(s.courierLat, s.courierLng, true);
+
     fitAll(s);
+    if (fb) fb.style.display='none';
+    setTimeout(()=>{ if(liveMap) liveMap.invalidateSize(); }, 300);
   } catch(e) {
-    console.error('Map error:', e);
-    const fb = document.getElementById('mapFallback');
-    if (fb) { fb.style.display='block'; fb.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,0.5);">⚠️ No se pudo cargar el mapa</div>'; }
+    console.error('Map error:', e.message);
+    if (fb) { fb.style.display='flex'; fb.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.4);padding:20px;"><div style="font-size:28px;">🗺️</div><div style="font-size:13px;margin-top:8px;">Mapa no disponible</div></div>'; }
   }
 }
 
 function placeCourier(lat, lng, instant) {
-  if (!gMap) return;
-  if (!gMarkers.courier) {
-    gMarkers.courier = new google.maps.Marker({
-      map: gMap,
-      position: { lat, lng },
-      title: 'Repartidor',
-      zIndex: 100,
-      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#FF5A36', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 },
-      animation: google.maps.Animation.DROP
-    });
+  if (!liveMap) return;
+  const mkCour = L.divIcon({className:'',html:'<div style="position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center;"><div style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(255,90,54,0.4);animation:mpp 1.8s ease-out infinite;"></div><div style="width:14px;height:14px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);z-index:2;"></div></div>',iconSize:[24,24],iconAnchor:[12,12]});
+  if (!markers.courier) {
+    markers.courier = L.marker([lat,lng],{icon:mkCour,zIndexOffset:1000}).addTo(liveMap).bindPopup('🛵 Repartidor');
   } else {
-    if (instant) {
-      gMarkers.courier.setPosition({ lat, lng });
-    } else {
-      animateGMarker(gMarkers.courier, { lat, lng });
-    }
+    if (instant) markers.courier.setLatLng([lat,lng]);
+    else animateMarker(markers.courier,[lat,lng]);
   }
-  // Progress line
-  gLines.forEach(l => l.setMap(null));
-  gLines = [];
+  routeLines.forEach(l=>liveMap.removeLayer(l)); routeLines=[];
   if (shipment?.originLat) {
-    gLines.push(new google.maps.Polyline({
-      map: gMap,
-      path: [{ lat: shipment.originLat, lng: shipment.originLng }, { lat, lng }],
-      strokeColor: '#FF5A36',
-      strokeWeight: 4,
-      strokeOpacity: 0.9
-    }));
+    routeLines.push(L.polyline([[shipment.originLat,shipment.originLng],[lat,lng]],{color:'#FF5A36',weight:4,opacity:0.9}).addTo(liveMap));
   }
   document.getElementById('mrCrVal').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
 }
 
-function animateGMarker(marker, toPos) {
-  const fromPos = marker.getPosition();
-  const frames = 30;
-  let frame = 0;
-  const timer = setInterval(() => {
-    frame++;
-    const t = frame / frames;
-    const ease = t < .5 ? 2*t*t : -1+(4-2*t)*t;
-    marker.setPosition({
-      lat: fromPos.lat() + (toPos.lat - fromPos.lat()) * ease,
-      lng: fromPos.lng() + (toPos.lng - fromPos.lng()) * ease
-    });
-    if (frame >= frames) clearInterval(timer);
-  }, 40);
+function animateMarker(mk, [toL,toG]) {
+  const from=mk.getLatLng(), t0=performance.now(), dur=1200;
+  function step(now) {
+    const p=Math.min(1,(now-t0)/dur), e=p<.5?2*p*p:-1+(4-2*p)*p;
+    mk.setLatLng([from.lat+(toL-from.lat)*e, from.lng+(toG-from.lng)*e]);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 function fitAll(s) {
-  if (!gMap) return;
-  const bounds = new google.maps.LatLngBounds();
-  let hasPoints = false;
-  if (s.originLat) { bounds.extend({ lat: s.originLat, lng: s.originLng }); hasPoints = true; }
-  if (s.courierLat) { bounds.extend({ lat: s.courierLat, lng: s.courierLng }); hasPoints = true; }
-  if (s.destLat) { bounds.extend({ lat: s.destLat, lng: s.destLng }); hasPoints = true; }
-  if (hasPoints) gMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-}
-
-
   if (!liveMap) return;
   const pts=[];
   if(s.originLat) pts.push([s.originLat,s.originLng]);
@@ -535,86 +492,27 @@ function fitAll(s) {
   if(s.destLat) pts.push([s.destLat,s.destLng]);
   if(pts.length>=2) liveMap.fitBounds(L.latLngBounds(pts),{padding:[44,44]});
   else if(pts.length===1) liveMap.setView(pts[0],14);
-  else liveMap.setView([-34.6037,-58.3816],13); // default: Buenos Aires
+  else liveMap.setView([-34.6037,-58.3816],12);
 }
 
-// ─── Sheet UI ──────────────────────────────────────────────────────────────
-function showSheet(s) {
-  document.getElementById('sheet').style.display='block';
-  document.getElementById('liveMap').style.display='block';
-  document.getElementById('invalidScreen').style.display='none';
-
-  document.getElementById('topProduct').textContent = s.product;
-  document.getElementById('topCarrier').textContent = `${s.carrier} · ${s.tracking}`;
-  document.getElementById('prodEmo').textContent    = s.emoji||'📦';
-  document.getElementById('prodName').textContent   = s.product;
-  document.getElementById('prodCarrier').textContent= s.carrier;
-  document.getElementById('prodCode').textContent   = s.tracking;
-  document.getElementById('productRow').style.display='flex';
-  document.getElementById('mrOrVal').textContent    = s.originName||'—';
-  document.getElementById('mrDtVal').textContent    = s.destName||'—';
-
-  if (s.alert) {
-    document.getElementById('alertBox').style.display='flex';
-    document.getElementById('alertText').textContent = s.alert;
-  } else {
-    document.getElementById('alertBox').style.display='none';
-  }
-
-  updateStatus(s);
-  refreshETA();
-  clearInterval(etaTimer);
-  etaTimer = setInterval(refreshETA, 30000);
-}
-
-function updateStatus(s) {
-  const chip  = document.getElementById('liveChip');
-  const cdot  = chip.querySelector('.cdot');
-  const sdot  = document.getElementById('sdot');
-  const main  = document.getElementById('stextMain');
-  const sub   = document.getElementById('stextSub');
-  const chipT = document.getElementById('chipTxt');
-
-  sdot.className = 'sdot';
-
-  if (s.currentStep===5) {
-    sdot.classList.add('delivered');
-    main.textContent='✓ Entrega completada';
-    sub.textContent ='';
-    chip.className='live-chip delivered';
-    chipT.textContent='Entregado';
-  } else if (s.courierActive && s.courierLat) {
-    sdot.classList.add('active');
-    const ago = timeAgo(s.positionUpdatedAt);
-    main.textContent='🛵 Repartidor en camino';
-    sub.textContent =`GPS activo · última posición: ${ago}`;
-    chip.className='live-chip active';
-    chipT.textContent='GPS en vivo';
-  } else if (s.courierLat) {
-    sdot.classList.add('waiting');
-    main.textContent='Repartidor pausó el GPS';
-    sub.textContent ='La última posición conocida se muestra en el mapa';
-    chip.className='live-chip';
-    chipT.textContent='GPS pausado';
-  } else {
-    sdot.classList.add('offline');
-    main.textContent='Esperando al repartidor…';
-    sub.textContent ='El mapa se actualizará cuando el GPS esté activo';
-    chip.className='live-chip';
-    chipT.textContent='Sin GPS';
-  }
-}
 
 // ─── WebSocket ─────────────────────────────────────────────────────────────
 function connect() {
   if (!code) return;
   clearTimeout(reconnTimer);
-  const proto = location.protocol==='https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}`);
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({type:'join', code}));
-  };
+  
+  try {
+    const proto = location.protocol==='https:' ? 'wss' : 'ws';
+    const wsUrl = `${proto}://${location.host}`;
+    console.log('Conectando WebSocket a:', wsUrl);
+    ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('WebSocket conectado OK');
+      const sub = document.getElementById('topSub');
+      if (sub) sub.textContent = 'Trazo · Seguimiento en vivo';
+      ws.send(JSON.stringify({type:'join', code}));
+    };
 
   ws.onmessage = e => {
     let msg; try { msg=JSON.parse(e.data); } catch { return; }
@@ -643,10 +541,9 @@ function connect() {
       updateStatus(shipment);
       refreshETA();
       // pan map gently to keep courier visible
-      if (gMap && gMarkers.courier) {
-        const pos = gMarkers.courier.getPosition();
-        if (!gMap.getBounds()?.contains(pos)) {
-          gMap.panTo(pos);
+      if (liveMap && markers.courier) {
+        if (!liveMap.getBounds().contains(markers.courier.getLatLng())) {
+          liveMap.panTo(markers.courier.getLatLng(), {animate:true,duration:0.8});
         }
       }
     }
@@ -658,19 +555,16 @@ function connect() {
     }
   };
 
-  let reconnAttempts = 0;
-  ws.onclose = () => {
-    reconnAttempts++;
-    const delay = Math.min(reconnAttempts * 2000, 10000); // 2s, 4s, 6s... max 10s
-    console.log(`Reconectando en ${delay/1000}s... (intento ${reconnAttempts})`);
-    if (reconnAttempts === 1) {
-      // Show reconnecting message
-      const sub = document.getElementById('topSub');
-      if (sub) sub.textContent = 'Reconectando...';
-    }
-    reconnTimer = setTimeout(() => { reconnAttempts = 0; connect(); }, delay);
+  ws.onclose = (e) => {
+    console.log('WebSocket cerrado, código:', e.code, 'razón:', e.reason);
+    const sub = document.getElementById('topSub');
+    if (sub) sub.textContent = 'Reconectando...';
+    reconnTimer = setTimeout(connect, 3000);
   };
-  ws.onerror = () => ws.close();
+  ws.onerror = (e) => {
+    console.error('WebSocket error:', e);
+    ws.close();
+  };
 }
 
 // ─── Courier GPS ───────────────────────────────────────────────────────────
