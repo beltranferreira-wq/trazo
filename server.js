@@ -277,4 +277,17 @@ server.listen(PORT, '0.0.0.0', async () => {
   console.log('Trazo en puerto', PORT);
   try { await initDB(); console.log('DB lista.'); }
   catch(e) { console.error('DB error:', e.message); }
+
+  // ─── Keep-alive: evita que Render duerma el servidor ───────────────────
+  // Hace un ping a sí mismo cada 10 minutos
+  if (process.env.RENDER) {
+    const https = require('https');
+    const selfUrl = process.env.RENDER_EXTERNAL_URL || 'https://trazo-hbrf.onrender.com';
+    setInterval(() => {
+      https.get(selfUrl + '/health', (res) => {
+        console.log('Keep-alive ping:', res.statusCode);
+      }).on('error', () => {});
+    }, 10 * 60 * 1000); // cada 10 minutos
+    console.log('Keep-alive activado para:', selfUrl);
+  }
 });
