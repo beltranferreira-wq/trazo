@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="manifest" href="/manifest.json">
 <title>TRAZO · Tu pedido en camino</title>
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;background:#1A1D2E;color:#fff;}
@@ -74,7 +74,15 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;backg
     <div class="chip" id="chip"><span class="dot"></span><span id="chipTxt">Cargando</span></div>
   </div>
 
-  <div id="map"></div>
+  <div id="map" style="position:relative;">
+  <iframe id="mapFrame" 
+    style="width:100%;height:100%;border:none;display:block;"
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    src="about:blank">
+  </iframe>
+  <div id="mapMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:13px;pointer-events:none;">Cargando mapa...</div>
+</div>
 
   <div class="sheet" id="sheet">
     <div class="handle"></div>
@@ -108,7 +116,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;backg
 
 <div class="toast" id="toast"></div>
 
-<script src="/vendor/leaflet/leaflet.js"></script>
+
 <script>
 'use strict';
 
@@ -140,60 +148,72 @@ function showInvalid() {
 
 if (!code) { showInvalid(); }
 
-// ── Map ──────────────────────────────────────────────────────────────────────
-function initMap(s) {
-  var el = document.getElementById('map');
-  try {
-    var center = s.courierLat ? [s.courierLat, s.courierLng]
-               : s.originLat  ? [s.originLat, s.originLng]
-               : [-34.6037, -58.3816];
-    liveMap = L.map(el, { zoomControl: true });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, attribution: '© CARTO © OSM'
-    }).addTo(liveMap);
-    if (s.originLat) {
-      markers.origin = L.circleMarker([s.originLat, s.originLng], {radius:7, color:'#fff', weight:2, fillColor:'#9AA3B2', fillOpacity:1}).addTo(liveMap).bindPopup(s.originName || 'Origen');
-    }
-    if (s.destLat) {
-      markers.dest = L.circleMarker([s.destLat, s.destLng], {radius:9, color:'#fff', weight:3, fillColor:'#15182B', fillOpacity:1}).addTo(liveMap).bindPopup(s.destName || 'Destino');
-    }
-    if (s.originLat && s.destLat) {
-      L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]], {color:'rgba(255,255,255,0.15)', weight:3, dashArray:'4 8'}).addTo(liveMap);
-    }
-    if (s.courierLat) placeCourier(s.courierLat, s.courierLng, true);
-    fitAll(s);
-    mapReady = true;
-    setTimeout(function(){ if(liveMap) liveMap.invalidateSize(); }, 300);
-  } catch(e) {
-    console.error('Map error:', e.message);
-    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.3);font-size:13px;">Mapa no disponible</div>';
+// ── Map via Google Maps Embed ─────────────────────────────────────────────────
+var lastMapUrl = '';
+
+function buildMapUrl(s) {
+  var origin = '';
+  var dest = '';
+  var waypoints = '';
+  
+  if (s.originLat && s.originLng) {
+    origin = s.originLat + ',' + s.originLng;
+  } else if (s.originName) {
+    origin = encodeURIComponent(s.originName);
   }
+  
+  if (s.destLat && s.destLng) {
+    dest = s.destLat + ',' + s.destLng;
+  } else if (s.destName) {
+    dest = encodeURIComponent(s.destName);
+  }
+  
+  if (!origin || !dest) return null;
+  
+  // Use courier position as waypoint if available
+  if (s.courierLat && s.courierLng) {
+    waypoints = '&waypoints=' + s.courierLat + ',' + s.courierLng;
+  }
+  
+  return 'https://www.google.com/maps/embed/v1/directions?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY' +
+    '&origin=' + origin +
+    '&destination=' + dest +
+    waypoints +
+    '&mode=driving';
+}
+
+function initMap(s) {
+  var url = buildMapUrl(s);
+  if (!url) {
+    document.getElementById('mapMsg').textContent = 'Sin coordenadas para mostrar el mapa';
+    return;
+  }
+  var frame = document.getElementById('mapFrame');
+  frame.src = url;
+  lastMapUrl = url;
+  mapReady = true;
+  frame.onload = function() {
+    document.getElementById('mapMsg').style.display = 'none';
+  };
+  frame.onerror = function() {
+    document.getElementById('mapMsg').textContent = 'Mapa no disponible';
+  };
 }
 
 function placeCourier(lat, lng, instant) {
-  if (!liveMap) return;
-  if (!markers.courier) {
-    markers.courier = L.circleMarker([lat, lng], {radius:10, color:'#fff', weight:3, fillColor:'#FF5A36', fillOpacity:1}).addTo(liveMap).bindPopup('🛵 Repartidor');
-  } else {
-    markers.courier.setLatLng([lat, lng]);
-  }
-  routeLines.forEach(function(l){ liveMap.removeLayer(l); });
-  routeLines = [];
-  if (shipment && shipment.originLat) {
-    routeLines.push(L.polyline([[shipment.originLat,shipment.originLng],[lat,lng]], {color:'#FF5A36', weight:4, opacity:0.9}).addTo(liveMap));
-  }
   document.getElementById('mrCr').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+  // Update map with new courier position
+  if (shipment) {
+    var newUrl = buildMapUrl(shipment);
+    if (newUrl && newUrl !== lastMapUrl) {
+      document.getElementById('mapFrame').src = newUrl;
+      lastMapUrl = newUrl;
+    }
+  }
 }
 
 function fitAll(s) {
-  if (!liveMap) return;
-  var pts = [];
-  if (s.originLat) pts.push([s.originLat, s.originLng]);
-  if (s.courierLat) pts.push([s.courierLat, s.courierLng]);
-  if (s.destLat) pts.push([s.destLat, s.destLng]);
-  if (pts.length >= 2) liveMap.fitBounds(L.latLngBounds(pts), {padding:[44,44]});
-  else if (pts.length === 1) liveMap.setView(pts[0], 14);
-  else liveMap.setView([-34.6037, -58.3816], 12);
+  // Handled by Google Maps embed
 }
 
 // ── ETA ──────────────────────────────────────────────────────────────────────
@@ -288,12 +308,6 @@ function fetchState() {
       } else if (s.courierLat && s.courierLat !== prevLat) {
         placeCourier(s.courierLat, s.courierLng, false);
         updateETA(s);
-        if (liveMap && markers.courier) {
-          var b = liveMap.getBounds();
-          if (!b.contains(markers.courier.getLatLng())) {
-            liveMap.panTo(markers.courier.getLatLng(), {animate:true, duration:0.8});
-          }
-        }
       }
     })
     .catch(function(e) {
