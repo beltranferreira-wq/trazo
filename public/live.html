@@ -5,641 +5,358 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1A1D2E">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Trazo · En vivo">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.json">
-
-
 <title>TRAZO · Tu pedido en camino</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <style>
-:root{
-  --ink:#15182B; --surface:#fff; --line:#DBE0E8; --muted:#6B7180;
-  --paper:#ECF0F5; --dark:#1A1D2E; --dark2:#22263A;
-  --accent:#FF5A36; --accent-soft:#FFE6DD;
-  --success:#1F9D6F; --success-soft:#DCF1E6;
-  --warn:#D14343; --warn-soft:#FBE2E0;
-  --amber:#C9871E; --amber-soft:#F8E9CC;
-  --safe-t:env(safe-area-inset-top,0px);
-  --safe-b:env(safe-area-inset-bottom,0px);
-}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{margin:0;height:100%;overscroll-behavior:none;overflow:hidden;}
-body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--dark);
-  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;}
-h1,h2,.product-name{font-family:'Space Grotesk',sans-serif;}
-.mono{font-family:'IBM Plex Mono',monospace;}
-button{font-family:inherit;cursor:pointer;border:none;}
-a{text-decoration:none;}
-@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
-
-/* ── TOP BAR ── */
-.topbar{
-  display:flex;align-items:center;gap:11px;
-  padding:calc(var(--safe-t) + 12px) 16px 12px;
-  background:var(--dark);flex-shrink:0;z-index:20;
-}
-.brand-mark{
-  width:34px;height:34px;border-radius:9px;
-  background:rgba(255,255,255,0.12);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.brand-mark svg{width:18px;height:18px;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;background:#1A1D2E;color:#fff;}
+.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#1A1D2E;flex-shrink:0;}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-mark svg{width:18px;height:18px;}
 .topbar-text{flex:1;min-width:0;}
-.topbar-product{font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Space Grotesk',sans-serif;}
+.topbar-product{font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .topbar-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:1px;}
-.live-chip{
-  display:flex;align-items:center;gap:5px;
-  font-size:11px;font-weight:700;padding:5px 10px;
-  border-radius:20px;white-space:nowrap;flex-shrink:0;
-  background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);
-  transition:background .3s,color .3s;
-}
-.live-chip .cdot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.4);}
-.live-chip.active{background:var(--accent);color:#fff;}
-.live-chip.active .cdot{background:#fff;animation:blink 1.2s ease-in-out infinite;}
-.live-chip.delivered{background:var(--success);color:#fff;}
-.live-chip.delivered .cdot{background:#fff;animation:none;}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
-
-/* ── MAP ── */
-#liveMap{flex:1;min-height:0;background:var(--dark2);position:relative;}
-
-/* ── BOTTOM SHEET ── */
-.sheet{
-  background:var(--surface);
-  border-radius:22px 22px 0 0;
-  padding:0 18px calc(16px + var(--safe-b));
-  flex-shrink:0;
-  box-shadow:0 -12px 40px rgba(0,0,0,0.35);
-  max-height:56vh;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  transition:max-height .3s ease;
-}
-.sheet-handle{width:38px;height:5px;border-radius:3px;background:var(--line);margin:14px auto 0;}
-
-/* ── ETA HERO ── */
-.eta-hero{
-  display:flex;align-items:center;gap:14px;
-  background:var(--ink);color:#fff;
-  border-radius:16px;padding:16px;margin-top:16px;
-}
-.eta-icon{
-  width:48px;height:48px;border-radius:13px;
-  background:rgba(255,255,255,0.1);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.eta-icon svg{width:24px;height:24px;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;}
-.eta-vals{flex:1;min-width:0;}
-.eta-big{font-size:26px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:-0.02em;line-height:1.1;}
-.eta-arr{font-size:12.5px;color:rgba(255,255,255,0.65);margin-top:3px;}
-.eta-km{font-size:11.5px;color:rgba(255,255,255,0.45);margin-top:2px;}
-
-/* ── PRODUCT ROW ── */
-.product-row{display:flex;align-items:flex-start;gap:12px;margin-top:14px;}
-.product-emo{font-size:32px;line-height:1;flex-shrink:0;}
-.product-info{flex:1;min-width:0;}
-.product-name{font-size:18px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;}
-.product-carrier{font-size:12.5px;color:var(--muted);margin-top:3px;}
-.product-code{display:flex;align-items:center;gap:6px;margin-top:6px;}
-.product-code span{font-size:12px;color:var(--muted);}
-
-/* ── STATUS ROW ── */
-.status-row{
-  display:flex;align-items:flex-start;gap:10px;
-  background:var(--paper);border-radius:12px;padding:12px 13px;margin-top:12px;
-}
-.sdot{width:9px;height:9px;border-radius:50%;margin-top:3px;flex-shrink:0;}
-.sdot.active{background:var(--success);box-shadow:0 0 0 3px var(--success-soft);animation:sp 1.6s ease-in-out infinite;}
-.sdot.waiting{background:var(--amber);}
-.sdot.delivered{background:var(--success);}
-.sdot.offline{background:var(--muted);}
-@keyframes sp{0%,100%{box-shadow:0 0 0 3px var(--success-soft);}50%{box-shadow:0 0 0 6px var(--success-soft);}}
+.chip{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);flex-shrink:0;}
+.chip.live{background:#FF5A36;color:#fff;animation:none;}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.chip.live .dot{animation:blink 1.2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+#map{flex:1;min-height:0;background:#1E2235;}
+.sheet{background:#fff;color:#15182B;border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));flex-shrink:0;max-height:55vh;overflow-y:auto;}
+.handle{width:36px;height:4px;border-radius:2px;background:#DBE0E8;margin:0 auto 14px;}
+.eta-card{display:flex;align-items:center;gap:14px;background:#15182B;color:#fff;border-radius:14px;padding:14px;margin-bottom:14px;}
+.eta-icon{width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;}
+.eta-big{font-size:24px;font-weight:700;}
+.eta-sub{font-size:11.5px;color:rgba(255,255,255,0.6);margin-top:2px;}
+.prod-name{font-size:18px;font-weight:700;}
+.prod-carrier{font-size:12.5px;color:#6B7180;margin-top:3px;}
+.status-row{display:flex;align-items:center;gap:8px;background:#ECF0F5;border-radius:11px;padding:11px 13px;margin-top:12px;}
+.sdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.sdot.active{background:#1F9D6F;animation:sp 1.6s ease-in-out infinite;}
+.sdot.waiting{background:#C9871E;}
+.sdot.off{background:#6B7180;}
+@keyframes sp{0%,100%{box-shadow:0 0 0 3px #DCF1E6;}50%{box-shadow:0 0 0 6px #DCF1E6;}}
 .stext b{font-size:13.5px;font-weight:700;display:block;}
-.stext small{font-size:11.5px;color:var(--muted);}
-
-/* ── MINI ROUTE ── */
-.mini-route{
-  display:flex;flex-direction:column;gap:0;
-  background:var(--paper);border-radius:12px;padding:12px 14px;margin-top:12px;
-}
-.mr-row{display:flex;align-items:center;gap:10px;position:relative;}
+.stext small{font-size:11.5px;color:#6B7180;}
+.route-mini{background:#ECF0F5;border-radius:11px;padding:12px 14px;margin-top:12px;}
+.mr-row{display:flex;align-items:center;gap:10px;font-size:12.5px;}
 .mr-row+.mr-row{margin-top:8px;}
 .mr-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .mr-dot.or{background:#9AA3B2;}
-.mr-dot.cr{background:var(--accent);}
-.mr-dot.dt{background:var(--ink);}
-.mr-lbl{font-size:10.5px;color:var(--muted);width:70px;flex-shrink:0;font-weight:600;}
+.mr-dot.cr{background:#FF5A36;}
+.mr-dot.dt{background:#15182B;}
+.mr-lbl{font-size:10.5px;color:#6B7180;width:72px;flex-shrink:0;font-weight:600;}
 .mr-val{flex:1;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.mr-val.mono{font-size:11.5px;color:var(--muted);}
-.mr-line{position:absolute;left:4px;top:12px;width:2px;height:calc(100% + 8px);background:var(--line);}
-
-/* ── ALERT ── */
-.alert-box{
-  display:flex;gap:9px;align-items:flex-start;
-  background:var(--warn-soft);color:#9A2E2E;
-  border-radius:12px;padding:12px 14px;
-  font-size:13px;line-height:1.45;margin-top:12px;
-}
-.alert-box svg{width:17px;height:17px;stroke:var(--warn);flex-shrink:0;margin-top:1px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;}
-
-/* ── COURIER BUTTON ── */
-.btn-courier{
-  width:100%;margin-top:14px;
-  background:var(--ink);color:#fff;
-  border:none;border-radius:14px;padding:15px;
-  font-size:15px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;gap:9px;
-  transition:background .2s;
-}
-.btn-courier svg{width:18px;height:18px;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;flex-shrink:0;}
-.btn-courier.sharing{background:var(--success);}
-.btn-courier:active{opacity:0.85;}
-.btn-courier:disabled{background:var(--muted);cursor:default;}
-
-/* ── BOTTOM PADDING ── */
-.sheet-pad{height:8px;}
-
-/* ── MAP PINS ── */
-
-
-
-
-
-
-
-@keyframes mpp{0%{transform:scale(1);opacity:.7;}100%{transform:scale(3.5);opacity:0;}}
-
-/* ── INVALID SCREEN ── */
-.invalid{
-  flex:1;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;text-align:center;padding:36px 24px;
-}
-.invalid-icon{font-size:56px;margin-bottom:16px;}
-.invalid h2{font-size:20px;font-weight:700;color:#fff;margin:0 0 10px;font-family:'Space Grotesk',sans-serif;}
-.invalid p{font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;margin:0;}
-
-/* ── TOAST ── */
-.toast{
-  position:fixed;bottom:calc(12px + var(--safe-b));
-  left:50%;transform:translateX(-50%) translateY(16px);
-  background:var(--ink);color:#fff;
-  font-size:13.5px;font-weight:600;
-  padding:11px 20px;border-radius:30px;
-  opacity:0;pointer-events:none;
-  transition:opacity .25s,transform .25s;z-index:500;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);
-  white-space:nowrap;
-}
+.btn-courier{width:100%;margin-top:14px;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;background:#15182B;color:#fff;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;}
+.btn-courier.sharing{background:#1F9D6F;}
+.invalid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;color:rgba(255,255,255,0.6);}
+.invalid b{font-size:18px;color:#fff;display:block;margin-bottom:8px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#15182B;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:30px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:500;}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+#root{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+#sheet{display:none;}
+#invalidScreen{display:none;}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
 </head>
 <body>
+<div id="root">
+  <div class="topbar">
+    <div class="brand-mark">
+      <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/></svg>
+    </div>
+    <div class="topbar-text">
+      <div class="topbar-product" id="topProduct">TRAZO · Tu pedido en camino</div>
+      <div class="topbar-sub" id="topSub">Cargando...</div>
+    </div>
+    <div class="chip" id="chip"><span class="dot"></span><span id="chipTxt">Cargando</span></div>
+  </div>
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="brand-mark">
-    <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/></svg>
+  <div id="map"></div>
+
+  <div class="sheet" id="sheet">
+    <div class="handle"></div>
+    <div class="eta-card">
+      <div class="eta-icon">🛵</div>
+      <div>
+        <div class="eta-big" id="etaBig">—</div>
+        <div class="eta-sub" id="etaSub"></div>
+      </div>
+    </div>
+    <div class="prod-name" id="prodName">—</div>
+    <div class="prod-carrier" id="prodCarrier"></div>
+    <div class="status-row">
+      <div class="sdot off" id="sdot"></div>
+      <div class="stext"><b id="stextMain">Cargando...</b><small id="stextSub"></small></div>
+    </div>
+    <div class="route-mini">
+      <div class="mr-row"><div class="mr-dot or"></div><span class="mr-lbl">Origen</span><span class="mr-val" id="mrOr">—</span></div>
+      <div class="mr-row"><div class="mr-dot cr"></div><span class="mr-lbl">Repartidor</span><span class="mr-val" id="mrCr" style="font-family:monospace;font-size:11px;">Sin señal</span></div>
+      <div class="mr-row"><div class="mr-dot dt"></div><span class="mr-lbl">Destino</span><span class="mr-val" id="mrDt">—</span></div>
+    </div>
+    <button class="btn-courier" id="courierBtn">📍 Soy el repartidor — Activar GPS</button>
   </div>
-  <div class="topbar-text">
-    <div class="topbar-product" id="topProduct">TRAZO · Tu pedido en camino</div>
-    <div class="topbar-sub" id="topCarrier">Conectando…</div>
-  </div>
-  <div class="live-chip" id="liveChip">
-    <span class="cdot"></span>
-    <span id="chipTxt">Sin GPS</span>
+
+  <div class="invalid" id="invalidScreen">
+    <div style="font-size:48px;margin-bottom:12px;">📦</div>
+    <b>Enlace no encontrado</b>
+    <span>Este enlace no existe o el pedido ya fue entregado.<br>Pedile al local que te reenvíe el link.</span>
   </div>
 </div>
 
-<!-- MAP -->
-<div id="liveMap">
-  <div id="mapFallback" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:rgba(255,255,255,0.5);z-index:999;pointer-events:none;">
-    <div style="font-size:32px;margin-bottom:8px;">🗺️</div>
-    <div style="font-size:13px;">Cargando mapa...</div>
-  </div>
-</div>
-
-<!-- BOTTOM SHEET -->
-<div class="sheet" id="sheet" style="display:none">
-  <div class="sheet-handle"></div>
-
-  <div class="eta-hero" id="etaHero">
-    <div class="eta-icon">
-      <svg viewBox="0 0 24 24"><rect x="1" y="7" width="13" height="9" rx="1"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="5.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/></svg>
-    </div>
-    <div class="eta-vals">
-      <div class="eta-big" id="etaBig">Calculando…</div>
-      <div class="eta-arr" id="etaArr"></div>
-      <div class="eta-km" id="etaKm"></div>
-    </div>
-  </div>
-
-  <div class="product-row" id="productRow" style="display:none">
-    <span class="product-emo" id="prodEmo">📦</span>
-    <div class="product-info">
-      <div class="product-name" id="prodName">—</div>
-      <div class="product-carrier" id="prodCarrier"></div>
-      <div class="product-code"><span class="mono" id="prodCode"></span></div>
-    </div>
-  </div>
-
-  <div class="alert-box" id="alertBox" style="display:none">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-    <span id="alertText"></span>
-  </div>
-
-  <div class="status-row" id="statusRow">
-    <div class="sdot waiting" id="sdot"></div>
-    <div class="stext">
-      <b id="stextMain">Esperando al repartidor…</b>
-      <small id="stextSub"></small>
-    </div>
-  </div>
-
-  <div class="mini-route" id="miniRoute">
-    <div class="mr-row" id="mrOr">
-      <div class="mr-line"></div>
-      <div class="mr-dot or"></div>
-      <span class="mr-lbl">Origen</span>
-      <span class="mr-val" id="mrOrVal">—</span>
-    </div>
-    <div class="mr-row" id="mrCr">
-      <div class="mr-line"></div>
-      <div class="mr-dot cr"></div>
-      <span class="mr-lbl">Repartidor</span>
-      <span class="mr-val mono" id="mrCrVal">Sin señal</span>
-    </div>
-    <div class="mr-row">
-      <div class="mr-dot dt"></div>
-      <span class="mr-lbl">Destino</span>
-      <span class="mr-val" id="mrDtVal">—</span>
-    </div>
-  </div>
-
-  <button class="btn-courier" id="courierBtn">
-    <svg viewBox="0 0 24 24"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg>
-    🛵 Soy el repartidor — Activar GPS
-  </button>
-  <div class="sheet-pad"></div>
-</div>
-
-<!-- INVALID -->
-<div class="invalid" id="invalidScreen" style="display:none">
-  <div class="invalid-icon">📦</div>
-  <h2>Enlace no encontrado</h2>
-  <p>Este enlace no existe o el pedido ya fue entregado.<br>Pedile al local que te reenvíe el link.</p>
-</div>
-
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
 
-// ─── Service Worker ────────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
-}
+var code = new URLSearchParams(location.search).get('code');
+var shipment = null;
+var liveMap = null;
+var markers = {};
+var routeLines = [];
+var pollTimer = null;
+var mapReady = false;
+var courierSharing = false;
+var watchId = null;
+var lastSend = 0;
+var toastTimer;
 
-// ─── Params ────────────────────────────────────────────────────────────────
-const code = new URLSearchParams(location.search).get('code');
-
-// ─── State ─────────────────────────────────────────────────────────────────
-let ws            = null;
-let reconnTimer   = null;
-let shipment      = null;
-let liveMap       = null;
-let markers       = {};
-let routeLines    = [];
-let courierSharing = false;
-let watchId       = null;
-let lastSend      = 0;
-let etaTimer      = null;
-
-// ─── Toast ─────────────────────────────────────────────────────────────────
-let toastTimer;
 function toast(msg) {
-  const t = document.getElementById('toast');
+  var t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('on'), 2400);
+  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2400);
 }
 
-// ─── Utils ─────────────────────────────────────────────────────────────────
-function haversine(a, b) {
-  const R=6371000, r=d=>d*Math.PI/180;
-  const dL=r(b.lat-a.lat), dG=r(b.lng-a.lng);
-  const s=Math.sin(dL/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dG/2)**2;
-  return 2*R*Math.asin(Math.sqrt(s));
-}
-
-async function getRoute(from, to) {
-  try {
-    const ctrl = new AbortController();
-    setTimeout(()=>ctrl.abort(), 5000);
-    const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false&steps=false`;
-    const res = await fetch(url, {signal: ctrl.signal});
-    const d = await res.json();
-    if (d?.routes?.[0]) return { secs: d.routes[0].duration, meters: d.routes[0].distance, real: true };
-  } catch(e) {}
-  // fallback: straight line at 30 km/h
-  const m = haversine(from, to);
-  return { secs: (m/1000/30)*3600, meters: m, real: false };
-}
-
-function showETA(eta) {
-  const mins  = Math.max(1, Math.round(eta.secs/60));
-  const arr   = new Date(Date.now() + eta.secs*1000);
-  const hh    = String(arr.getHours()).padStart(2,'0');
-  const mm    = String(arr.getMinutes()).padStart(2,'0');
-  const km    = (eta.meters/1000).toFixed(1);
-  const big   = mins<60 ? `~${mins} min` : `~${Math.floor(mins/60)}h ${mins%60}min`;
-  document.getElementById('etaBig').textContent = big;
-  document.getElementById('etaArr').textContent = `Llegada estimada: ${hh}:${mm} hs`;
-  document.getElementById('etaKm').textContent  = `${km} km ${eta.real?'por ruta real (OSRM)':'· distancia directa'}`;
-}
-
-function refreshETA() {
-  if (!shipment) return;
-  const from = (shipment.courierLat && shipment.courierLng)
-    ? { lat: shipment.courierLat, lng: shipment.courierLng }
-    : (shipment.originLat ? { lat: shipment.originLat, lng: shipment.originLng } : null);
-  const to = shipment.destLat ? { lat: shipment.destLat, lng: shipment.destLng } : null;
-  if (!from || !to) { document.getElementById('etaBig').textContent = '—'; return; }
-  getRoute(from, to).then(showETA);
-}
-
-function timeAgo(iso) {
-  if (!iso) return '';
-  const d = Math.max(0, Date.now()-new Date(iso));
-  const m = Math.floor(d/60000);
-  if (m<1) return 'ahora';
-  if (m<60) return `hace ${m} min`;
-  return `hace ${Math.floor(m/60)}h`;
-}
-
-// ─── Invalid screen ────────────────────────────────────────────────────────
 function showInvalid() {
-  document.getElementById('liveMap').style.display = 'none';
+  document.getElementById('map').style.display = 'none';
   document.getElementById('sheet').style.display = 'none';
   document.getElementById('invalidScreen').style.display = 'flex';
 }
 
 if (!code) { showInvalid(); }
 
-// ─── Map ───────────────────────────────────────────────────────────────────
-// ─── Leaflet Map ────────────────────────────────────────────────────────────
-let liveMap = null;
-let markers = {};
-let routeLines = [];
-
-async function geocode(address) {
+// ── Map ──────────────────────────────────────────────────────────────────────
+function initMap(s) {
+  var el = document.getElementById('map');
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Argentina')}&limit=1`, {headers:{'Accept-Language':'es','User-Agent':'Trazo/1.0'}});
-    const d = await r.json();
-    if (d && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-  } catch(e) {}
-  return null;
-}
-
-async function initMap(s) {
-  const el = document.getElementById('liveMap');
-  const fb = document.getElementById('mapFallback');
-  if (!el) return;
-
-  // Geocode if missing coords
-  if ((!s.originLat || !s.originLng) && s.originName) {
-    const c = await geocode(s.originName);
-    if (c) { s.originLat = c.lat; s.originLng = c.lng; }
-  }
-  if ((!s.destLat || !s.destLng) && s.destName) {
-    const c = await geocode(s.destName);
-    if (c) { s.destLat = c.lat; s.destLng = c.lng; }
-  }
-
-  try {
-    if (typeof L === 'undefined') throw new Error('Leaflet no cargado');
-    
-    const center = s.courierLat ? [s.courierLat, s.courierLng]
-      : s.originLat ? [s.originLat, s.originLng]
-      : [-34.6037, -58.3816];
-
-    liveMap = L.map(el, { zoomControl: true, attributionControl: true });
-    
-    // CARTO dark tiles (muy confiables en Argentina)
+    var center = s.courierLat ? [s.courierLat, s.courierLng]
+               : s.originLat  ? [s.originLat, s.originLng]
+               : [-34.6037, -58.3816];
+    liveMap = L.map(el, { zoomControl: true });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© <a href="https://carto.com">CARTO</a>'
+      maxZoom: 19, attribution: '© CARTO © OSM'
     }).addTo(liveMap);
-
-    const mkOr = L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);"></div>',iconSize:[12,12],iconAnchor:[6,6]});
-    const mkDt = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
-
-    if (s.originLat) markers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(liveMap).bindPopup(s.originName||'Origen');
-    if (s.destLat)   markers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(liveMap).bindPopup(s.destName||'Destino');
+    if (s.originLat) {
+      markers.origin = L.circleMarker([s.originLat, s.originLng], {radius:7, color:'#fff', weight:2, fillColor:'#9AA3B2', fillOpacity:1}).addTo(liveMap).bindPopup(s.originName || 'Origen');
+    }
+    if (s.destLat) {
+      markers.dest = L.circleMarker([s.destLat, s.destLng], {radius:9, color:'#fff', weight:3, fillColor:'#15182B', fillOpacity:1}).addTo(liveMap).bindPopup(s.destName || 'Destino');
+    }
     if (s.originLat && s.destLat) {
-      L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'rgba(255,255,255,0.2)',weight:3,dashArray:'4 8'}).addTo(liveMap);
+      L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]], {color:'rgba(255,255,255,0.15)', weight:3, dashArray:'4 8'}).addTo(liveMap);
     }
     if (s.courierLat) placeCourier(s.courierLat, s.courierLng, true);
-
     fitAll(s);
-    if (fb) fb.style.display='none';
-    setTimeout(()=>{ if(liveMap) liveMap.invalidateSize(); }, 300);
+    mapReady = true;
+    setTimeout(function(){ if(liveMap) liveMap.invalidateSize(); }, 300);
   } catch(e) {
     console.error('Map error:', e.message);
-    if (fb) { fb.style.display='flex'; fb.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.4);padding:20px;"><div style="font-size:28px;">🗺️</div><div style="font-size:13px;margin-top:8px;">Mapa no disponible</div></div>'; }
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.3);font-size:13px;">Mapa no disponible</div>';
   }
 }
 
 function placeCourier(lat, lng, instant) {
   if (!liveMap) return;
-  const mkCour = L.divIcon({className:'',html:'<div style="position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center;"><div style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(255,90,54,0.4);animation:mpp 1.8s ease-out infinite;"></div><div style="width:14px;height:14px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);z-index:2;"></div></div>',iconSize:[24,24],iconAnchor:[12,12]});
   if (!markers.courier) {
-    markers.courier = L.marker([lat,lng],{icon:mkCour,zIndexOffset:1000}).addTo(liveMap).bindPopup('🛵 Repartidor');
+    markers.courier = L.circleMarker([lat, lng], {radius:10, color:'#fff', weight:3, fillColor:'#FF5A36', fillOpacity:1}).addTo(liveMap).bindPopup('🛵 Repartidor');
   } else {
-    if (instant) markers.courier.setLatLng([lat,lng]);
-    else animateMarker(markers.courier,[lat,lng]);
+    markers.courier.setLatLng([lat, lng]);
   }
-  routeLines.forEach(l=>liveMap.removeLayer(l)); routeLines=[];
-  if (shipment?.originLat) {
-    routeLines.push(L.polyline([[shipment.originLat,shipment.originLng],[lat,lng]],{color:'#FF5A36',weight:4,opacity:0.9}).addTo(liveMap));
+  routeLines.forEach(function(l){ liveMap.removeLayer(l); });
+  routeLines = [];
+  if (shipment && shipment.originLat) {
+    routeLines.push(L.polyline([[shipment.originLat,shipment.originLng],[lat,lng]], {color:'#FF5A36', weight:4, opacity:0.9}).addTo(liveMap));
   }
-  document.getElementById('mrCrVal').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
-}
-
-function animateMarker(mk, [toL,toG]) {
-  const from=mk.getLatLng(), t0=performance.now(), dur=1200;
-  function step(now) {
-    const p=Math.min(1,(now-t0)/dur), e=p<.5?2*p*p:-1+(4-2*p)*p;
-    mk.setLatLng([from.lat+(toL-from.lat)*e, from.lng+(toG-from.lng)*e]);
-    if(p<1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
+  document.getElementById('mrCr').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
 }
 
 function fitAll(s) {
   if (!liveMap) return;
-  const pts=[];
-  if(s.originLat) pts.push([s.originLat,s.originLng]);
-  if(s.courierLat) pts.push([s.courierLat,s.courierLng]);
-  if(s.destLat) pts.push([s.destLat,s.destLng]);
-  if(pts.length>=2) liveMap.fitBounds(L.latLngBounds(pts),{padding:[44,44]});
-  else if(pts.length===1) liveMap.setView(pts[0],14);
-  else liveMap.setView([-34.6037,-58.3816],12);
+  var pts = [];
+  if (s.originLat) pts.push([s.originLat, s.originLng]);
+  if (s.courierLat) pts.push([s.courierLat, s.courierLng]);
+  if (s.destLat) pts.push([s.destLat, s.destLng]);
+  if (pts.length >= 2) liveMap.fitBounds(L.latLngBounds(pts), {padding:[44,44]});
+  else if (pts.length === 1) liveMap.setView(pts[0], 14);
+  else liveMap.setView([-34.6037, -58.3816], 12);
 }
 
+// ── ETA ──────────────────────────────────────────────────────────────────────
+function haversine(a, b) {
+  var R=6371000, r=function(d){return d*Math.PI/180;};
+  var dL=r(b.lat-a.lat), dG=r(b.lng-a.lng);
+  var s=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dG/2)*Math.sin(dG/2);
+  return 2*R*Math.asin(Math.sqrt(s));
+}
 
-// ─── HTTP Polling (reemplaza WebSocket para máxima compatibilidad) ────────────
-let pollTimer = null;
-let lastStep = null;
-let lastCourierLat = null;
-let mapInitialized = false;
+function updateETA(s) {
+  if (!s.destLat) return;
+  var from = (s.courierLat && s.courierLng) ? {lat:s.courierLat, lng:s.courierLng}
+           : (s.originLat ? {lat:s.originLat, lng:s.originLng} : null);
+  if (!from) return;
+  var meters = haversine(from, {lat:s.destLat, lng:s.destLng});
+  var mins = Math.max(1, Math.round((meters/1000/30)*60));
+  var arr = new Date(Date.now() + mins*60000);
+  var hh = String(arr.getHours()).padStart(2,'0'), mm = String(arr.getMinutes()).padStart(2,'0');
+  document.getElementById('etaBig').textContent = mins < 60 ? ('~'+mins+' min') : ('~'+Math.floor(mins/60)+'h '+mins%60+'min');
+  document.getElementById('etaSub').textContent = 'Llegada estimada: '+hh+':'+mm+' hs · '+(meters/1000).toFixed(1)+' km';
+}
 
-async function fetchState() {
-  try {
-    const r = await fetch(`/api/track/${encodeURIComponent(code)}`);
-    if (!r.ok) { showInvalid(); return; }
-    const s = await r.json();
-    
-    // Init map only once
-    if (!mapInitialized) {
+// ── UI ───────────────────────────────────────────────────────────────────────
+var STEPS = ['🍔 Preparando tu pedido','🛵 En camino','📍 A punto de llegar','✅ Entregado'];
+
+function updateUI(s) {
+  document.getElementById('topProduct').textContent = s.product;
+  document.getElementById('prodName').textContent = s.product;
+  document.getElementById('prodCarrier').textContent = 'Transportista: ' + s.carrier + ' · ' + s.tracking;
+  document.getElementById('mrOr').textContent = s.originName || '—';
+  document.getElementById('mrDt').textContent = s.destName || '—';
+  document.getElementById('sheet').style.display = 'block';
+  document.getElementById('invalidScreen').style.display = 'none';
+
+  var sdot = document.getElementById('sdot');
+  var main = document.getElementById('stextMain');
+  var sub  = document.getElementById('stextSub');
+  var chip = document.getElementById('chip');
+  var chipTxt = document.getElementById('chipTxt');
+  var topSub = document.getElementById('topSub');
+
+  sdot.className = 'sdot';
+  chip.className = 'chip';
+
+  if (s.currentStep === 3) {
+    sdot.classList.add('active');
+    main.textContent = '✅ Pedido entregado';
+    sub.textContent = '';
+    chipTxt.textContent = 'Entregado';
+    chip.style.background = '#1F9D6F';
+    chip.style.color = '#fff';
+    topSub.textContent = 'Entregado';
+  } else if (s.courierActive && s.courierLat) {
+    sdot.classList.add('active');
+    main.textContent = '🛵 Repartidor en camino';
+    sub.textContent = 'GPS activo · última posición: ahora';
+    chipTxt.textContent = 'GPS en vivo';
+    chip.classList.add('live');
+    topSub.textContent = s.carrier + ' · ' + s.tracking;
+  } else if (s.courierLat) {
+    sdot.classList.add('waiting');
+    main.textContent = 'Repartidor pausó el GPS';
+    sub.textContent = 'La última posición conocida se muestra en el mapa';
+    chipTxt.textContent = 'GPS pausado';
+    topSub.textContent = s.carrier + ' · ' + s.tracking;
+  } else {
+    sdot.classList.add('off');
+    main.textContent = STEPS[s.currentStep] || 'En proceso';
+    sub.textContent = 'Esperando al repartidor...';
+    chipTxt.textContent = 'Sin GPS';
+    topSub.textContent = s.carrier + ' · ' + s.tracking;
+  }
+
+  updateETA(s);
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+function fetchState() {
+  fetch('/api/track/' + encodeURIComponent(code))
+    .then(function(r) {
+      if (!r.ok) { showInvalid(); return null; }
+      return r.json();
+    })
+    .then(function(s) {
+      if (!s) return;
+      var prevLat = shipment ? shipment.courierLat : null;
       shipment = s;
-      showSheet(s);
-      initMap(s);
-      mapInitialized = true;
-    } else {
-      shipment = s;
-      // Update status if changed
-      updateStatus(s);
-      // Update courier position if changed
-      if (s.courierLat && s.courierLng &&
-          (s.courierLat !== lastCourierLat || s.courierLng !== lastCourierLat)) {
-        lastCourierLat = s.courierLat;
+      updateUI(s);
+      if (!mapReady) {
+        initMap(s);
+      } else if (s.courierLat && s.courierLat !== prevLat) {
         placeCourier(s.courierLat, s.courierLng, false);
+        updateETA(s);
         if (liveMap && markers.courier) {
-          const b = liveMap.getBounds();
+          var b = liveMap.getBounds();
           if (!b.contains(markers.courier.getLatLng())) {
             liveMap.panTo(markers.courier.getLatLng(), {animate:true, duration:0.8});
           }
         }
-        refreshETA();
       }
-    }
-  } catch(e) {
-    console.log('Poll error:', e.message);
-  }
-}
-
-async function sendPosition(lat, lng) {
-  try {
-    await fetch('/api/courier-position', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ code, lat, lng })
+    })
+    .catch(function(e) {
+      console.log('Poll error:', e.message);
     });
-  } catch(e) {}
 }
 
-async function sendStop() {
-  try {
-    await fetch('/api/courier-stop', {
-      method: 'POST', 
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ code })
-    });
-  } catch(e) {}
-}
-
-function startPolling() {
-  fetchState();
-  pollTimer = setInterval(fetchState, 3000);
-}
-
-// ─── Courier GPS ───────────────────────────────────────────────────────────
-const courierBtn = document.getElementById('courierBtn');
-
-courierBtn.addEventListener('click', () => {
-  if (courierSharing) stopGPS();
-  else startGPS();
+// ── Courier GPS ───────────────────────────────────────────────────────────────
+document.getElementById('courierBtn').addEventListener('click', function() {
+  if (courierSharing) stopGPS(); else startGPS();
 });
 
 function startGPS() {
-  if (!('geolocation' in navigator)) {
-    toast('Tu dispositivo no soporta GPS');
-    return;
-  }
-  courierBtn.disabled = true;
-  courierBtn.textContent = 'Solicitando permiso de GPS…';
-
+  if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
+  var btn = document.getElementById('courierBtn');
+  btn.textContent = 'Solicitando GPS...';
   watchId = navigator.geolocation.watchPosition(
-    pos => {
-      const {latitude:lat, longitude:lng, accuracy} = pos.coords;
-
-      // Update map immediately
-      placeCourier(lat, lng, false);
-      if (shipment) {
-        shipment.courierLat=lat; shipment.courierLng=lng;
-        shipment.courierActive=true;
-        shipment.positionUpdatedAt=new Date().toISOString();
-        updateStatus(shipment);
-        refreshETA();
-      }
-
-      // Send to server max every 3s
-      const now = Date.now();
-      if (now-lastSend < 3000) return;
+    function(pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      if (liveMap) placeCourier(lat, lng, false);
+      var now = Date.now();
+      if (now - lastSend < 3000) return;
       lastSend = now;
-      sendPosition(lat, lng);
-
-      // Button state
+      fetch('/api/courier-position', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code:code, lat:lat, lng:lng})
+      }).catch(function(){});
       if (!courierSharing) {
         courierSharing = true;
-        courierBtn.disabled = false;
-        courierBtn.classList.add('sharing');
-        courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 📍 GPS activo — Tocá para detener`;
-        toast('📍 GPS activado. Todos pueden ver tu posición en tiempo real.');
+        btn.className = 'btn-courier sharing';
+        btn.textContent = '📍 GPS activo — Tocá para detener';
+        toast('GPS activado. El cliente ve tu posición en tiempo real.');
       }
     },
-    err => {
-      courierBtn.disabled = false;
-      courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 🛵 Soy el repartidor — Activar GPS`;
-      const msgs = {1:'Permiso de GPS denegado. Habilitalo en ajustes del navegador.',2:'GPS no disponible en este momento.',3:'Tiempo de espera agotado. Intentá de nuevo.'};
-      toast(msgs[err.code]||'No se pudo obtener el GPS.');
-      courierSharing=false;
+    function(err) {
+      var msgs = {1:'Permiso denegado. Habilitá el GPS en ajustes.',2:'GPS no disponible.',3:'Tiempo agotado.'};
+      toast(msgs[err.code] || 'No se pudo acceder al GPS.');
+      var btn = document.getElementById('courierBtn');
+      btn.textContent = '📍 Soy el repartidor — Activar GPS';
+      courierSharing = false;
     },
-    {enableHighAccuracy:true, maximumAge:2000, timeout:12000}
+    {enableHighAccuracy:true, maximumAge:3000, timeout:12000}
   );
 }
 
 function stopGPS() {
-  if (watchId!==null) { navigator.geolocation.clearWatch(watchId); watchId=null; }
-  courierSharing=false;
-  sendStop();
-  if (shipment) { shipment.courierActive=false; updateStatus(shipment); }
-  courierBtn.classList.remove('sharing');
-  courierBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> 🛵 Soy el repartidor — Activar GPS`;
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  courierSharing = false;
+  fetch('/api/courier-stop', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})}).catch(function(){});
+  var btn = document.getElementById('courierBtn');
+  btn.className = 'btn-courier';
+  btn.textContent = '📍 Soy el repartidor — Activar GPS';
   toast('GPS detenido.');
 }
 
 window.addEventListener('beforeunload', stopGPS);
-window.addEventListener('pagehide', stopGPS);
-window.addEventListener('resize', ()=>{ if(liveMap) liveMap.invalidateSize(); });
 
-// ─── Start ─────────────────────────────────────────────────────────────────
-if (code) startPolling();
-
-// Show fallback message if map tiles don't load after 5s
-setTimeout(() => {
-  const fb = document.getElementById('mapFallback');
-  if (fb && !liveMap) { fb.style.display = 'block'; }
-}, 5000);
+// ── Start ─────────────────────────────────────────────────────────────────────
+if (code) {
+  fetchState();
+  pollTimer = setInterval(fetchState, 3000);
+}
 </script>
 </body>
 </html>
