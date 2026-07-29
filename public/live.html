@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trazo · En vivo">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.json">
 
 
@@ -387,8 +389,28 @@ function showInvalid() {
 if (!code) { showInvalid(); }
 
 // ─── Map ───────────────────────────────────────────────────────────────────
-function initMap(s) {
+async function geocode(address) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, {headers:{'Accept-Language':'es'}});
+    const d = await r.json();
+    if (d && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+  } catch(e) {}
+  return null;
+}
+
+async function initMap(s) {
   const el = document.getElementById('liveMap');
+
+  // Si faltan coordenadas, intentar geocodificar por nombre
+  if ((!s.originLat || !s.originLng) && s.originName) {
+    const coords = await geocode(s.originName);
+    if (coords) { s.originLat = coords.lat; s.originLng = coords.lng; }
+  }
+  if ((!s.destLat || !s.destLng) && s.destName) {
+    const coords = await geocode(s.destName);
+    if (coords) { s.destLat = coords.lat; s.destLng = coords.lng; }
+  }
+
   try {
     liveMap = L.map(el, { zoomControl:false, attributionControl:true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -469,6 +491,7 @@ function fitAll(s) {
   if(s.destLat) pts.push([s.destLat,s.destLng]);
   if(pts.length>=2) liveMap.fitBounds(L.latLngBounds(pts),{padding:[44,44]});
   else if(pts.length===1) liveMap.setView(pts[0],14);
+  else liveMap.setView([-34.6037,-58.3816],13); // default: Buenos Aires
 }
 
 // ─── Sheet UI ──────────────────────────────────────────────────────────────
