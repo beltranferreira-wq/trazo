@@ -997,8 +997,8 @@ function renderDetail(s) {
     ? `<div class="alert-box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>${s.alert}</div>` : '';
 
   const advHtml = s.currentStep < 5
-    ? (s.currentStep < 2 ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
-    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>` : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
+    ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
+    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
 
   document.getElementById('detailContent').innerHTML = `
     <div class="dcard-top">
@@ -1247,22 +1247,25 @@ var BRANCHES = {
   esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.7456', lng:'-58.2218' },
   quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
 };
-document.getElementById('f-branch').addEventListener('change', function() {
-  var b = BRANCHES[this.value];
-  if (!b) return;
-  document.getElementById('f-oname').value = b.name;
-  document.getElementById('f-olat').value  = b.lat;
-  document.getElementById('f-olng').value  = b.lng;
-  var st = document.getElementById('geo-status-origin');
-  if (st) { st.textContent = '✅ ' + b.name; st.style.color = 'var(--success)'; }
-});
-// Init on load
-(function(){
-  var b = BRANCHES['esquel'];
-  document.getElementById('f-oname').value = b.name;
-  document.getElementById('f-olat').value  = b.lat;
-  document.getElementById('f-olng').value  = b.lng;
+
+// Safe branch selector setup
+(function setupBranch() {
+  try {
+    var sel = document.getElementById('f-branch');
+    if (!sel) return;
+    sel.addEventListener('change', function() {
+      var b = BRANCHES[this.value];
+      if (!b) return;
+      var n=document.getElementById('f-oname'); if(n) n.value=b.name;
+      var la=document.getElementById('f-olat');  if(la) la.value=b.lat;
+      var lo=document.getElementById('f-olng');  if(lo) lo.value=b.lng;
+      var st=document.getElementById('geo-status-origin');
+      if(st){st.textContent='✅ '+b.name;st.style.color='var(--success)';}
+    });
+  } catch(e) { console.warn('Branch selector setup:', e.message); }
 })();
+// Branch setup handled in setupBranch IIFE above
+
 
 document.getElementById('geoBtn').onclick = () => {
   if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
@@ -1319,8 +1322,9 @@ if (new URLSearchParams(location.search).get('action') === 'new') {
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 applyLayout();
-loadAll();
 renderNotifs();
+// loadAll first thing - don't wait for anything else
+loadAll();
 
 </script>
 </body>
