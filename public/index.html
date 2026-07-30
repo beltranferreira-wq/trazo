@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#15182B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Trazo">
+<meta name="apple-mobile-web-app-title" content="Strike">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96.png">
@@ -19,7 +19,7 @@
 
 
 
-<title>TRAZO — Delivery en tiempo real</title>
+<title>Strike — Delivery en tiempo real</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -545,7 +545,7 @@ img,svg{display:block;}
     <div class="brand-mark">
       <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
     </div>
-    <div class="brand"><b>TRAZO</b><span>Delivery en tiempo real</span></div>
+    <div class="brand"><b>Strike</b><span>Delivery en tiempo real</span></div>
     <div class="topbar-btns">
       <button class="iBtn" id="notifMobileBtn">
         <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -559,7 +559,7 @@ img,svg{display:block;}
 
   <!-- ── INSTALL BANNER ── -->
   <div class="install-banner" id="installBanner">
-    <span>📲 <b>Instalá Trazo</b> en tu teléfono para usarla como app nativa.</span>
+    <span>📲 <b>Instalá Strike</b> en tu teléfono para usarla como app nativa.</span>
     <button class="ib-install" id="installBtn">Instalar</button>
     <button class="ib-close" id="installClose">×</button>
   </div>
@@ -570,7 +570,7 @@ img,svg{display:block;}
       <div class="brand-mark">
         <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/><circle cx="24" cy="24" r="2.5" fill="#FF5A36" opacity="0.55"/></svg>
       </div>
-      <div class="sidebar-title"><b>TRAZO</b><span>Delivery en tiempo real</span></div>
+      <div class="sidebar-title"><b>Strike</b><span>Delivery en tiempo real</span></div>
       <button class="iBtn" id="notifDeskBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-pip" id="notifDot2" style="display:none">0</span>
@@ -819,14 +819,14 @@ function badge(s) {
 }
 function waUrlCourier(s) {
   const live = `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
-  const txt = `🛵 *TRAZO* — Activá el GPS para este pedido:\n\n*${s.product}*\nCliente: ${s.recipient}\nDestino: ${s.destName||'ver en el mapa'}\n\n${live}\n\n👆 Abrí el link y tocá "Soy el repartidor — Activar GPS"`;
+  const txt = `🛵 *Strike* — Activá el GPS para este pedido:\n\n*${s.product}*\nCliente: ${s.recipient}\nDestino: ${s.destName||'ver en el mapa'}\n\n${live}\n\n👆 Abrí el link y tocá "Soy el repartidor — Activar GPS"`;
   const ph = (s.courierPhone||'').replace(/\D/g,'');
   return ph ? `https://wa.me/${ph}?text=${encodeURIComponent(txt)}`
             : `https://wa.me/?text=${encodeURIComponent(txt)}`;
 }
 function waUrl(s) {
   const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
-  const txt = `🚚 *Trazo* — Seguí tu pedido en tiempo real:\n\n📦 *${s.product}*\nCódigo: \`${s.tracking}\`\n\n${live}`;
+  const txt = `🚚 *Strike* — Seguí tu pedido en tiempo real:\n\n📦 *${s.product}*\nCódigo: \`${s.tracking}\`\n\n${live}`;
   const ph = (s.phone||'').replace(/\D/g,'');
   return ph ? `https://wa.me/${ph}?text=${encodeURIComponent(txt)}`
             : `https://wa.me/?text=${encodeURIComponent(txt)}`;
@@ -1124,7 +1124,7 @@ function addNotif(s, msg) {
   notifications.unshift({id:Date.now(),sid:s.id,product:s.product,msg,time:new Date().toISOString(),read:false});
   renderNotifs();
   if ('Notification' in window && Notification.permission==='granted') {
-    try { new Notification('Trazo', {body:`${s.product}: ${msg}`, icon:'/icons/icon-192.png'}); } catch(e){}
+    try { new Notification('Strike', {body:`${s.product}: ${msg}`, icon:'/icons/icon-192.png'}); } catch(e){}
   }
 }
 function renderNotifs() {
@@ -1210,7 +1210,7 @@ async function geocodeAddress(address, latId, lngId, statusId) {
     const query = address.trim() + ', Argentina';
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ar`,
-      { headers: { 'Accept-Language': 'es', 'User-Agent': 'Trazo-App/1.0' } }
+      { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' } }
     );
     const d = await r.json();
     if (d && d[0]) {
