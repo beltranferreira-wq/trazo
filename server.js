@@ -190,7 +190,7 @@ app.get('/share/:code', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM shipments WHERE tracking=$1', [code]);
   const s = rows[0] ? rowToShipment(rows[0]) : null;
   const STEPS = ['🍔 Preparando tu pedido','🛵 En camino','📍 A punto de llegar','✅ Entregado'];
-  const title = s ? `${s.emoji} ${s.product} — TRAZO` : 'TRAZO · Delivery en tiempo real';
+  const title = s ? `${s.emoji} ${s.product} — Strike` : 'Strike · Delivery en tiempo real';
   const desc  = s ? `${STEPS[s.currentStep]||'En proceso'} · Para: ${s.recipient}${s.destName?' · '+s.destName.split(',')[0]:''}` : 'Seguí tu pedido en tiempo real con GPS del repartidor.';
   const liveUrl  = `${req.protocol}://${req.get('host')}/live.html?code=${encodeURIComponent(code)}`;
   const imageUrl = `${req.protocol}://${req.get('host')}/og-image/${encodeURIComponent(code)}`;
@@ -204,7 +204,7 @@ app.get('/share/:code', async (req, res) => {
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="${liveUrl}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="TRAZO · Delivery en tiempo real">
+<meta property="og:site_name" content="Strike · Delivery en tiempo real">
 <meta name="twitter:card" content="summary_large_image">
 <meta http-equiv="refresh" content="0;url=${liveUrl}">
 <script>window.location.replace('${liveUrl}');</script>
@@ -216,10 +216,10 @@ app.get('/share/:code', async (req, res) => {
 const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
 
 const FONT_PATHS = [
-  ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',         'TrazoBold'],
-  ['/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 'TrazoBold'],
-  ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',              'TrazoReg'],
-  ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf','TrazoReg'],
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',         'StrikeBold'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 'StrikeBold'],
+  ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',              'StrikeReg'],
+  ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf','StrikeReg'],
 ];
 FONT_PATHS.forEach(([p,name]) => { try { if(fs.existsSync(p)) { GlobalFonts.registerFromPath(p,name); console.log('Font:',name,p); } } catch(e){} });
 
@@ -242,8 +242,8 @@ app.get('/og-image/:code', async (req, res) => {
   const dest      = s&&s.destName ? s.destName.split(',')[0] : '';
   try {
     const W=1200, H=630, canvas=createCanvas(W,H), ctx=canvas.getContext('2d');
-    const bold = n => `bold ${n}px TrazoBold`;
-    const reg  = n => `${n}px TrazoReg`;
+    const bold = n => `bold ${n}px StrikeBold`;
+    const reg  = n => `${n}px StrikeReg`;
     ctx.fillStyle='#15182B'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#0D0F1D'; ctx.fillRect(0,0,W,200);
     ctx.fillStyle='#FF5A36'; ctx.fillRect(0,0,12,H);
@@ -251,7 +251,7 @@ app.get('/og-image/:code', async (req, res) => {
     ctx.fillStyle='#ffffff'; ctx.fillRect(110,76,30,106);
     ctx.fillStyle='#FF5A36'; ctx.beginPath(); ctx.arc(220,172,18,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#0D0F1D'; ctx.beginPath(); ctx.arc(220,172,8,0,Math.PI*2);  ctx.fill();
-    ctx.fillStyle='#ffffff'; ctx.font=bold(88); ctx.fillText('TRAZO',258,160);
+    ctx.fillStyle='#ffffff'; ctx.font=bold(88); ctx.fillText('Strike',258,160);
     ctx.fillStyle='#FF5A36'; ctx.fillRect(258,170,390,6);
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font=reg(22); ctx.fillText('DELIVERY EN TIEMPO REAL',260,196);
     ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(60,210,W-120,1);
@@ -296,7 +296,7 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname,'public','index.html
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', async () => {
-  console.log('Trazo en puerto', PORT);
+  console.log('Strike en puerto', PORT);
   try { await initDB(); console.log('DB lista.'); }
   catch(e) { console.error('DB error:', e.message); }
 
