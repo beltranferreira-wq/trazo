@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="manifest" href="/manifest.json">
-<title>TRAZO · Tu pedido en camino</title>
+<title>Strike · Tu pedido en camino</title>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -68,7 +68,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;backg
       <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/></svg>
     </div>
     <div class="topbar-text">
-      <div class="topbar-product" id="topProduct">TRAZO · Tu pedido en camino</div>
+      <div class="topbar-product" id="topProduct">Strike · Tu pedido en camino</div>
       <div class="topbar-sub" id="topSub">Cargando...</div>
     </div>
     <div class="chip" id="chip"><span class="dot"></span><span id="chipTxt">Cargando</span></div>
@@ -172,7 +172,7 @@ function checkStepChange(s) {
     // Try browser notification too
     if ('Notification' in window && Notification.permission === 'granted') {
       var msgs = ['🍔 Tu pedido está en preparación', '🛵 Tu pedido está en camino', '✅ ¡Tu pedido fue entregado!'];
-      try { new Notification('TRAZO', { body: msgs[s.currentStep] || 'Estado actualizado', icon: '/icons/icon-192.png' }); } catch(e) {}
+      try { new Notification('Strike', { body: msgs[s.currentStep] || 'Estado actualizado', icon: '/icons/icon-192.png' }); } catch(e) {}
     }
   }
 }
