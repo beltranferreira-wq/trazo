@@ -291,6 +291,39 @@ app.post('/api/courier-stop', async (req, res) => {
   res.json({ ok:true });
 });
 
+
+// ─── Proxy de ruta real (OSRM) para no depender de la red del celular ─────
+app.get('/api/route', async (req, res) => {
+  const { oLat, oLng, dLat, dLng } = req.query;
+  if (!oLat || !oLng || !dLat || !dLng)
+    return res.status(400).json({ error: 'Faltan coordenadas' });
+  try {
+    const https = require('https');
+    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=false`;
+    const data = await new Promise((resolve, reject) => {
+      const req2 = https.get(url, { timeout: 8000 }, (r) => {
+        let body = '';
+        r.on('data', c => body += c);
+        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      });
+      req2.on('error', reject);
+      req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
+    });
+    if (data && data.routes && data.routes[0]) {
+      res.json({
+        km:       (data.routes[0].distance / 1000).toFixed(1),
+        secs:     Math.round(data.routes[0].duration),
+        geometry: data.routes[0].geometry,
+        real:     true
+      });
+    } else {
+      res.status(404).json({ error: 'Sin ruta disponible' });
+    }
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/health', (req, res) => res.json({ status:'ok' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
