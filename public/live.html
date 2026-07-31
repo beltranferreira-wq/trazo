@@ -75,13 +75,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;backg
   </div>
 
   <div id="map" style="position:relative;">
-  <iframe id="mapFrame" 
-    style="width:100%;height:100%;border:none;display:block;"
-    loading="lazy"
-    referrerpolicy="no-referrer-when-downgrade"
-    src="about:blank">
-  </iframe>
-  <div id="mapMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:13px;pointer-events:none;">Cargando mapa...</div>
+  <div id="mapMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:13px;pointer-events:none;z-index:10;">Cargando mapa...</div>
 </div>
 
   <div class="sheet" id="sheet">
@@ -117,6 +111,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',Arial,sans-serif;backg
 <div class="toast" id="toast"></div>
 
 
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
 
@@ -199,34 +194,120 @@ function showInvalid() {
 
 if (!code) { showInvalid(); }
 
-// ── Map via Google Maps Embed ─────────────────────────────────────────────────
-var lastMapUrl = '';
+// ── Leaflet Map with real road routing ───────────────────────────────────────
+var liveMap = null;
+var markers = {};
+var routeLines = [];
 
-function buildMapUrl(s) {
-  // Use uMap/OpenStreetMap embed - no API key needed
-  var mlat, mlon, zoom = 13;
-  
-  // Center on courier if available, otherwise origin
-  if (s.courierLat && s.courierLng) {
-    mlat = s.courierLat; mlon = s.courierLng;
-  } else if (s.originLat && s.originLng) {
-    mlat = s.originLat; mlon = s.originLng;
-  } else {
-    return null;
+async function initMap(s) {
+  const el = document.getElementById('map');
+  const msg = document.getElementById('mapMsg');
+  try {
+    if (typeof L === 'undefined') throw new Error('Leaflet no disponible');
+    liveMap = L.map(el, { zoomControl: true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      { maxZoom:19, attribution:'© CARTO © OSM' }
+    ).addTo(liveMap);
+    if (msg) msg.style.display = 'none';
+
+    if (s.originLat) {
+      markers.origin = L.circleMarker([s.originLat,s.originLng],
+        {radius:7,color:'#fff',weight:2,fillColor:'#9AA3B2',fillOpacity:1})
+        .addTo(liveMap).bindPopup(s.originName||'Origen');
+    }
+    if (s.destLat) {
+      markers.dest = L.circleMarker([s.destLat,s.destLng],
+        {radius:9,color:'#fff',weight:3,fillColor:'#15182B',fillOpacity:1})
+        .addTo(liveMap).bindPopup(s.destName||'Destino');
+    }
+    if (s.courierLat) placeCourier(s.courierLat, s.courierLng, true);
+
+    // Draw real road route origin → dest
+    await drawRoute(s);
+
+    fitAll(s);
+    setTimeout(()=>{ if(liveMap) liveMap.invalidateSize(); }, 300);
+  } catch(e) {
+    console.error('Map error:', e.message);
+    if (msg) { msg.style.display='flex'; msg.textContent='Mapa no disponible'; }
   }
-  
-  // Build markers string for OSM
-  var markers = '';
-  if (s.originLat) markers += '&marker=' + s.originLat + '%2C' + s.originLng;
-  if (s.courierLat) markers += '&marker=' + s.courierLat + '%2C' + s.courierLng;
-  if (s.destLat) markers += '&marker=' + s.destLat + '%2C' + s.destLng;
-  
-  return 'https://www.openstreetmap.org/export/embed.html?bbox=' +
-    (mlon-0.05) + '%2C' + (mlat-0.05) + '%2C' + (mlon+0.05) + '%2C' + (mlat+0.05) +
-    '&layer=mapnik' + markers;
 }
 
-function initMap(s) {
+async function drawRoute(s) {
+  if (!liveMap || !s.originLat || !s.destLat) return;
+  routeLines.forEach(l=>liveMap.removeLayer(l)); routeLines=[];
+  try {
+    const from = (s.courierLat && s.courierLng)
+      ? { lat: s.courierLat, lng: s.courierLng }
+      : { lat: s.originLat, lng: s.originLng };
+    const res = await fetch(
+      `/api/route?oLat=${from.lat}&oLng=${from.lng}&dLat=${s.destLat}&dLng=${s.destLng}`,
+      { cache: 'no-store' }
+    );
+    const data = await res.json();
+    if (data.geometry && data.geometry.coordinates) {
+      const latlngs = data.geometry.coordinates.map(c=>[c[1],c[0]]);
+      routeLines.push(
+        L.polyline(latlngs, {color:'#FF5A36', weight:4, opacity:0.9}).addTo(liveMap)
+      );
+      // Dashed full route if courier exists
+      if (s.courierLat && s.originLat) {
+        const fullRes = await fetch(
+          `/api/route?oLat=${s.originLat}&oLng=${s.originLng}&dLat=${s.destLat}&dLng=${s.destLng}`,
+          { cache: 'no-store' }
+        );
+        const fullData = await fullRes.json();
+        if (fullData.geometry && fullData.geometry.coordinates) {
+          const fll = fullData.geometry.coordinates.map(c=>[c[1],c[0]]);
+          routeLines.push(
+            L.polyline(fll, {color:'rgba(255,255,255,0.15)', weight:3, dashArray:'4 8'}).addTo(liveMap)
+          );
+        }
+      }
+    } else {
+      // Fallback straight line
+      if (s.originLat && s.destLat) {
+        routeLines.push(L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],
+          {color:'rgba(255,255,255,0.2)',weight:3,dashArray:'4 8'}).addTo(liveMap));
+      }
+    }
+  } catch(e) {
+    if (s.originLat && s.destLat) {
+      routeLines.push(L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],
+        {color:'rgba(255,255,255,0.2)',weight:3,dashArray:'4 8'}).addTo(liveMap));
+    }
+  }
+}
+
+function placeCourier(lat, lng, instant) {
+  if (!liveMap) return;
+  if (!markers.courier) {
+    const mk = L.divIcon({
+      className:'',
+      html:'<div style="position:relative;width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="position:absolute;width:22px;height:22px;border-radius:50%;background:rgba(255,90,54,.4);animation:mpp 1.8s ease-out infinite;"></div><div style="width:13px;height:13px;border-radius:50%;background:#FF5A36;border:3px solid #fff;z-index:2;"></div></div>',
+      iconSize:[22,22], iconAnchor:[11,11]
+    });
+    markers.courier = L.marker([lat,lng],{icon:mk,zIndexOffset:1000})
+      .addTo(liveMap).bindPopup('🛵 Repartidor');
+  } else {
+    markers.courier.setLatLng([lat,lng]);
+  }
+  document.getElementById('mrCr').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
+}
+
+function fitAll(s) {
+  if (!liveMap) return;
+  const pts=[];
+  if(s.originLat) pts.push([s.originLat,s.originLng]);
+  if(s.courierLat) pts.push([s.courierLat,s.courierLng]);
+  if(s.destLat) pts.push([s.destLat,s.destLng]);
+  if(pts.length>=2) liveMap.fitBounds(L.latLngBounds(pts),{padding:[44,44]});
+  else if(pts.length===1) liveMap.setView(pts[0],14);
+  else liveMap.setView([-34.74,-58.22],13);
+}
+
+// Dummy buildMapUrl (no longer used but referenced in old code)
+function buildMapUrl(s) {function initMap(s) {
   var url = buildMapUrl(s);
   if (!url) {
     document.getElementById('mapMsg').textContent = 'Sin coordenadas para mostrar el mapa';
@@ -349,10 +430,17 @@ function fetchState() {
       shipment = s;
       updateUI(s);
       if (!mapReady) {
-        initMap(s);
+        initMap(s).then(()=>{ mapReady=true; });
       } else if (s.courierLat && s.courierLat !== prevLat) {
         placeCourier(s.courierLat, s.courierLng, false);
+        drawRoute(s);
         updateETA(s);
+        if (liveMap && markers.courier) {
+          const b = liveMap.getBounds();
+          if (!b.contains(markers.courier.getLatLng())) {
+            liveMap.panTo(markers.courier.getLatLng(), {animate:true,duration:0.8});
+          }
+        }
       }
     })
     .catch(function(e) {
