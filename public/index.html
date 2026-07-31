@@ -669,7 +669,7 @@ img,svg{display:block;}
 
   <div class="fsec">Punto de origen</div>
   <div class="fg">
-    <label>Sucursal de despacho *</label>
+    <label>Sucursal de despacho * <span style="font-size:10px;color:var(--muted);font-weight:400;">— usá 📍 para coordenadas exactas</span></label>
     <select id="f-branch" style="width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;font-size:15px;color:var(--ink);background:var(--surface);-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\'><path fill=\' %236B7180\' d=\'M7 10l5 5 5-5z\'/></svg>');background-repeat:no-repeat;background-position:right 12px center;">
       <option value="esquel">📍 Esquel 1399, Ezpeleta</option>
       <option value="quilmes">📍 Triunvirato 661, Quilmes</option>
@@ -694,7 +694,7 @@ img,svg{display:block;}
   </div>
 
   <div id="geo-status-dest" style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
-  <div id="dist-hint" style="display:none;font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;"></div>
+  <div id="dist-hint" style="font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;min-height:0;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;"></div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
     <button class="btn-cancel" id="cancelBtn">Cancelar</button>
@@ -1227,6 +1227,11 @@ function closeModal() {
   document.body.style.overflow='';
   ['f-code','f-rec','f-phone','f-courier-phone','f-dname','f-dlat','f-dlng']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Reset distance hint
+  const dh=document.getElementById('dist-hint');
+  if(dh){dh.innerHTML='';dh.style.maxHeight='0';dh.style.padding='0';}
+  const gsd=document.getElementById('geo-status-dest');
+  if(gsd){gsd.textContent='';gsd.style.color='';}
   // Restore defaults for local fields
   const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
   const dbr = document.getElementById('f-branch'); if(dbr) dbr.value='esquel';
@@ -1280,6 +1285,7 @@ async function updateDistanceHint(){
       const timeStr = hh > 0 ? `${hh}h ${mm}min` : `${mm} min`;
       hint.innerHTML = `🛵 <strong>${km} km</strong> por calles · ~${timeStr} estimado`;
       hint.style.color='var(--success)';
+    hint.style.maxHeight='80px'; hint.style.padding='8px 12px';
     } else {
       throw new Error('Sin ruta');
     }
@@ -1288,18 +1294,21 @@ async function updateDistanceHint(){
     const kmLineal = haversineKm(oLat,oLng,dLat,dLng);
     hint.innerHTML = `📏 ~${kmLineal.toFixed(1)} km en línea recta <span style="color:var(--amber);font-size:10.5px;">(distancia real puede ser mayor)</span>`;
     hint.style.color='var(--muted)';
+  hint.style.maxHeight='80px'; hint.style.padding='8px 12px';
   }
-  hint.style.display='block';
 }
 async function geocodeAddress(address, latId, lngId, statusId) {
   const statusEl = document.getElementById(statusId);
   if (!address || address.trim().length < 6) return;
   if (statusEl) statusEl.textContent = '🔍 Buscando...';
   try {
-    // Add Quilmes context for better geocoding in Ezpeleta area
+    // Forzar contexto Ezpeleta para mejor geocodificación local
     const raw = address.trim();
-    const hasCity = /quilmes|ezpeleta|bernal|berazategui/i.test(raw);
-    const query = hasCity ? raw + ', Buenos Aires, Argentina' : raw + ', Quilmes, Buenos Aires, Argentina';
+    // Si no mencionan ciudad, agregamos Ezpeleta/Quilmes para mayor precisión
+    const hasCity = /quilmes|ezpeleta|bernal|berazategui|lanús|avellaneda/i.test(raw);
+    const query = hasCity
+      ? raw + ', Provincia de Buenos Aires, Argentina'
+      : raw + ', Ezpeleta, Quilmes, Buenos Aires, Argentina';
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ar`,
       { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' } }
