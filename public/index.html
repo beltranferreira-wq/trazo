@@ -693,7 +693,8 @@ img,svg{display:block;}
     <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlng" type="number" step="any" placeholder="Se completa solo..."></div>
   </div>
 
-  <div id="geo-status-dest" style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 6px;transition:color .3s;"></div>
+  <div id="geo-status-dest" style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
+  <div id="dist-hint" style="display:none;font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;"></div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
     <button class="btn-cancel" id="cancelBtn">Cancelar</button>
@@ -1202,6 +1203,26 @@ document.getElementById('cancelBtn').onclick = closeModal;
 let geoTimerOrigin = null;
 let geoTimerDest   = null;
 
+function haversineKm(lat1,lng1,lat2,lng2){
+  const R=6371,r=d=>d*Math.PI/180;
+  const dL=r(lat2-lat1),dG=r(lng2-lng1);
+  const a=Math.sin(dL/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dG/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function updateDistanceHint(){
+  const oLat=parseFloat(document.getElementById('f-olat')?.value);
+  const oLng=parseFloat(document.getElementById('f-olng')?.value);
+  const dLat=parseFloat(document.getElementById('f-dlat')?.value);
+  const dLng=parseFloat(document.getElementById('f-dlng')?.value);
+  const hint=document.getElementById('dist-hint');
+  if(!hint) return;
+  if(oLat&&oLng&&dLat&&dLng){
+    const km=haversineKm(oLat,oLng,dLat,dLng);
+    hint.textContent='📏 Distancia: ~'+km.toFixed(1)+' km del local';
+    hint.style.color='var(--success)';
+    hint.style.display='block';
+  } else { hint.style.display='none'; }
+}
 async function geocodeAddress(address, latId, lngId, statusId) {
   const statusEl = document.getElementById(statusId);
   if (!address || address.trim().length < 6) return;
@@ -1217,6 +1238,7 @@ async function geocodeAddress(address, latId, lngId, statusId) {
       document.getElementById(latId).value = parseFloat(d[0].lat).toFixed(6);
       document.getElementById(lngId).value = parseFloat(d[0].lon).toFixed(6);
       if (statusEl) { statusEl.textContent = '✅ ' + d[0].display_name.split(',').slice(0,2).join(','); statusEl.style.color = 'var(--success)'; }
+      if (latId === 'f-dlat') updateDistanceHint();
     } else {
       if (statusEl) { statusEl.textContent = '⚠️ No encontrada — revisá la dirección'; statusEl.style.color = 'var(--amber)'; }
     }
@@ -1233,6 +1255,10 @@ document.getElementById('f-oname').addEventListener('input', (e) => {
   geoTimerOrigin = setTimeout(() => geocodeAddress(val, 'f-olat', 'f-olng', 'geo-status-origin'), 900);
 });
 
+document.getElementById('f-dlat').addEventListener('change', updateDistanceHint);
+document.getElementById('f-dlng').addEventListener('change', updateDistanceHint);
+document.getElementById('f-dlat').addEventListener('change', updateDistanceHint);
+document.getElementById('f-dlng').addEventListener('change', updateDistanceHint);
 document.getElementById('f-dname').addEventListener('input', (e) => {
   clearTimeout(geoTimerDest);
   const val = e.target.value;
