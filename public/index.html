@@ -1209,19 +1209,47 @@ function haversineKm(lat1,lng1,lat2,lng2){
   const a=Math.sin(dL/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dG/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
-function updateDistanceHint(){
+
+async function updateDistanceHint(){
   const oLat=parseFloat(document.getElementById('f-olat')?.value);
   const oLng=parseFloat(document.getElementById('f-olng')?.value);
   const dLat=parseFloat(document.getElementById('f-dlat')?.value);
   const dLng=parseFloat(document.getElementById('f-dlng')?.value);
   const hint=document.getElementById('dist-hint');
   if(!hint) return;
-  if(oLat&&oLng&&dLat&&dLng){
-    const km=haversineKm(oLat,oLng,dLat,dLng);
-    hint.textContent='📏 Distancia: ~'+km.toFixed(1)+' km del local';
-    hint.style.color='var(--success)';
-    hint.style.display='block';
-  } else { hint.style.display='none'; }
+  if(!oLat||!oLng||!dLat||!dLng){ hint.style.display='none'; return; }
+
+  // Show loading state
+  hint.textContent='🔍 Calculando distancia por calles...';
+  hint.style.color='var(--muted)';
+  hint.style.display='block';
+
+  try {
+    // OSRM — real road routing (same engine as the live tracking map)
+    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=false&steps=false`;
+    const ctrl = new AbortController();
+    setTimeout(()=>ctrl.abort(), 6000);
+    const r = await fetch(url, {signal: ctrl.signal});
+    const d = await r.json();
+
+    if(d && d.routes && d.routes[0]) {
+      const km = (d.routes[0].distance / 1000).toFixed(1);
+      const mins = Math.round(d.routes[0].duration / 60);
+      const hh = Math.floor(mins/60);
+      const mm = mins % 60;
+      const timeStr = hh > 0 ? `${hh}h ${mm}min` : `${mm} min`;
+      hint.innerHTML = `🛵 <strong>${km} km</strong> por calles · ~${timeStr} estimado`;
+      hint.style.color='var(--success)';
+    } else {
+      throw new Error('Sin ruta');
+    }
+  } catch(e) {
+    // Fallback to straight-line with warning
+    const kmLineal = haversineKm(oLat,oLng,dLat,dLng);
+    hint.innerHTML = `📏 ~${kmLineal.toFixed(1)} km en línea recta <span style="color:var(--amber);font-size:10.5px;">(distancia real puede ser mayor)</span>`;
+    hint.style.color='var(--muted)';
+  }
+  hint.style.display='block';
 }
 async function geocodeAddress(address, latId, lngId, statusId) {
   const statusEl = document.getElementById(statusId);
@@ -1238,7 +1266,7 @@ async function geocodeAddress(address, latId, lngId, statusId) {
       document.getElementById(latId).value = parseFloat(d[0].lat).toFixed(6);
       document.getElementById(lngId).value = parseFloat(d[0].lon).toFixed(6);
       if (statusEl) { statusEl.textContent = '✅ ' + d[0].display_name.split(',').slice(0,2).join(','); statusEl.style.color = 'var(--success)'; }
-      if (latId === 'f-dlat') updateDistanceHint();
+      if (latId === 'f-dlat') { updateDistanceHint(); }
     } else {
       if (statusEl) { statusEl.textContent = '⚠️ No encontrada — revisá la dirección'; statusEl.style.color = 'var(--amber)'; }
     }
