@@ -1067,7 +1067,7 @@ function renderDetail(s) {
   document.getElementById('delBtn').onclick = () => deleteShipment(s.id);
 }
 
-function initDetailMap(s) {
+async function initDetailMap(s) {
   const el = document.getElementById('detailMap');
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
   try {
@@ -1076,18 +1076,57 @@ function initDetailMap(s) {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
       { maxZoom:19, attribution:'© <a href="https://carto.com">CARTO</a>' }
     ).addTo(detailMap);
-    const mkOr = L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>',iconSize:[12,12],iconAnchor:[6,6]});
-    const mkDt = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
-    const mkCr = L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:#FF5A36;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+
+    const mkOr = L.divIcon({className:'',html:'<div style="width:13px;height:13px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>',iconSize:[13,13],iconAnchor:[6,6]});
+    const mkDt = L.divIcon({className:'',html:'<div style="width:15px;height:15px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[15,15],iconAnchor:[7,7]});
+    const mkCr = L.divIcon({className:'',html:'<div style="width:15px;height:15px;border-radius:50%;background:#FF5A36;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[15,15],iconAnchor:[7,7]});
+
     if (s.originLat) detailMarkers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(detailMap).bindPopup(s.originName||'Origen');
     if (s.destLat)   detailMarkers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(detailMap).bindPopup(s.destName||'Destino');
-    if (s.originLat && s.destLat) L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'2 8'}).addTo(detailMap);
     if (s.courierLat && s.courierLng) {
       detailMarkers.courier = L.marker([s.courierLat,s.courierLng],{icon:mkCr}).addTo(detailMap).bindPopup('Repartidor');
-      L.polyline([[s.originLat,s.originLng],[s.courierLat,s.courierLng]],{color:s.alert?'#D14343':'#1F9D6F',weight:4}).addTo(detailMap);
     }
+
+    // Draw real road route if we have origin + dest
+    if (s.originLat && s.destLat) {
+      try {
+        const routeRes = await fetch(
+          `/api/route?oLat=${s.originLat}&oLng=${s.originLng}&dLat=${s.destLat}&dLng=${s.destLng}`,
+          { cache: 'no-store' }
+        );
+        const routeData = await routeRes.json();
+        if (routeData.geometry && routeData.geometry.coordinates) {
+          // GeoJSON coords are [lng, lat] — Leaflet needs [lat, lng]
+          const latlngs = routeData.geometry.coordinates.map(c => [c[1], c[0]]);
+          L.polyline(latlngs, {color:'#1F9D6F', weight:4, opacity:0.85}).addTo(detailMap);
+        } else {
+          // Fallback: straight line
+          L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'4 8'}).addTo(detailMap);
+        }
+      } catch(e) {
+        // Fallback: straight line
+        L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'4 8'}).addTo(detailMap);
+      }
+    }
+
+    // If courier active, draw courier → dest route
+    if (s.courierLat && s.courierLng && s.destLat) {
+      try {
+        const courierRes = await fetch(
+          `/api/route?oLat=${s.courierLat}&oLng=${s.courierLng}&dLat=${s.destLat}&dLng=${s.destLng}`,
+          { cache: 'no-store' }
+        );
+        const courierData = await courierRes.json();
+        if (courierData.geometry && courierData.geometry.coordinates) {
+          const latlngs = courierData.geometry.coordinates.map(c => [c[1], c[0]]);
+          L.polyline(latlngs, {color:'#FF5A36', weight:4, opacity:0.9}).addTo(detailMap);
+        }
+      } catch(e) {}
+    }
+
     const pts=[];
     if(s.originLat) pts.push([s.originLat,s.originLng]);
+    if(s.courierLat) pts.push([s.courierLat,s.courierLng]);
     if(s.destLat) pts.push([s.destLat,s.destLng]);
     if(pts.length>=2) detailMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});
     else if(pts.length===1) detailMap.setView(pts[0],14);
@@ -1225,16 +1264,17 @@ async function updateDistanceHint(){
   hint.style.display='block';
 
   try {
-    // OSRM — real road routing (same engine as the live tracking map)
-    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=false&steps=false`;
+    // Llamamos a nuestro propio servidor que hace el proxy a OSRM
+    // Así evitamos bloqueos de red en el celular del local
+    const url = `/api/route?oLat=${oLat}&oLng=${oLng}&dLat=${dLat}&dLng=${dLng}`;
     const ctrl = new AbortController();
-    setTimeout(()=>ctrl.abort(), 6000);
-    const r = await fetch(url, {signal: ctrl.signal});
+    setTimeout(()=>ctrl.abort(), 10000);
+    const r = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
     const d = await r.json();
 
-    if(d && d.routes && d.routes[0]) {
-      const km = (d.routes[0].distance / 1000).toFixed(1);
-      const mins = Math.round(d.routes[0].duration / 60);
+    if(d && d.km) {
+      const km = d.km;
+      const mins = Math.round(d.secs / 60);
       const hh = Math.floor(mins/60);
       const mm = mins % 60;
       const timeStr = hh > 0 ? `${hh}h ${mm}min` : `${mm} min`;
