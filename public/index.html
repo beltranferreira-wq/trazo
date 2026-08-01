@@ -1359,7 +1359,18 @@ function setDestMarker(lat, lng) {
   if (lbl) lbl.textContent = '✅ Destino marcado — arrastrá el pin para ajustar';
 }
 
+
+
 function showDestMiniMap(lat, lng) {
   if (!destMiniMap) initDestMap();
   setDestMarker(lat, lng);
 }
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+applyLayout();
+renderNotifs();
+loadAll();
+
+</script>
+</body>
+</html>
