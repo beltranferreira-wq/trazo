@@ -20,7 +20,6 @@
 
 
 <title>Strike — Delivery en tiempo real</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -712,7 +711,7 @@ img,svg{display:block;}
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+
 </head>
 <body>
 <!-- TEMP FIX -->
@@ -723,6 +722,14 @@ img,svg{display:block;}
 // Load Leaflet dynamically - non-blocking, app works without it
 function loadLeaflet(cb) {
   if (typeof L !== 'undefined') { if(cb) cb(); return; }
+  // Load CSS first
+  if (!document.getElementById('leaflet-css')) {
+    const css = document.createElement('link');
+    css.id = 'leaflet-css';
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+  }
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   script.crossOrigin = '';
