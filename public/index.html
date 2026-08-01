@@ -677,8 +677,8 @@ img,svg{display:block;}
     <input type="hidden" id="f-oname" value="KING RESTO-BAR — Esquel 1399, Ezpeleta">
   </div>
   <div class="frow">
-    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.7620"></div>
-    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.2150"></div>
+    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.747042"></div>
+    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.220667"></div>
   </div>
   <p style="font-size:11px;color:var(--muted);margin:-8px 0 8px;padding:0 2px;">💡 Las coordenadas mejoran el mapa. Podés usar el botón de abajo o dejarlas vacías — el sistema las busca automáticamente por la dirección.</p>
       <button class="btn-geo" id="geoBtn">
@@ -1236,8 +1236,8 @@ function closeModal() {
   const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
   const dbr = document.getElementById('f-branch'); if(dbr) dbr.value='esquel';
   const dn = document.getElementById('f-oname'); if(dn) dn.value='KING RESTO-BAR — Esquel 1399, Ezpeleta';
-  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.7620';
-  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.2150';
+  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.747042';
+  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.220667';
 }
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
@@ -1406,7 +1406,7 @@ document.getElementById('f-dname').addEventListener('input', (e) => {
 
 // ─── Branch selector ──────────────────────────────────────────────────────────
 var BRANCHES = {
-  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.7620', lng:'-58.2150' },
+  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.747042', lng:'-58.220667' },
   quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
 };
 
