@@ -712,13 +712,37 @@ img,svg{display:block;}
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
 <!-- TEMP FIX -->
-<script src="/vendor/leaflet/leaflet.js"></script>
+
 <script>
 'use strict';
+
+// Load Leaflet dynamically - non-blocking, app works without it
+function loadLeaflet(cb) {
+  if (typeof L !== 'undefined') { if(cb) cb(); return; }
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.crossOrigin = '';
+  script.onload = function() { if(cb) cb(); };
+  script.onerror = function() {
+    // Fallback: try cdnjs
+    const s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
+    s2.onload = function() { if(cb) cb(); };
+    s2.onerror = function() {
+      // Last fallback: local vendor
+      const s3 = document.createElement('script');
+      s3.src = '/vendor/leaflet/leaflet.js';
+      s3.onload = function() { if(cb) cb(); };
+      document.head.appendChild(s3);
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(script);
+}
 
 // ─── Service Worker ────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -1077,6 +1101,10 @@ function renderDetail(s) {
 async function initDetailMap(s) {
   const el = document.getElementById('detailMap');
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
+  if (typeof L === 'undefined') {
+    loadLeaflet(function() { initDetailMap(s); });
+    return;
+  }
   try {
     if (typeof L === 'undefined') return;
     detailMap = L.map(el, { scrollWheelZoom:false });
@@ -1227,6 +1255,7 @@ function openModal() {
   document.getElementById('modalSheet').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('f-prod').focus(),350);
+  setTimeout(initDestMap, 500);
 }
 function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
@@ -1260,7 +1289,11 @@ const EZPELETA_CENTER = [-34.7420, -58.2230];
 
 function initDestMap() {
   const el = document.getElementById('dest-mini-map');
-  if (!el || typeof L === 'undefined' || destMiniMap) return;
+  if (!el || destMiniMap) return;
+  if (typeof L === 'undefined') {
+    loadLeaflet(function() { initDestMap(); });
+    return;
+  }
 
   // Init map centered on Ezpeleta
   const oLat = parseFloat(document.getElementById('f-olat').value) || EZPELETA_CENTER[0];
@@ -1320,5 +1353,3 @@ function showDestMiniMap(lat, lng) {
   if (!destMiniMap) initDestMap();
   setDestMarker(lat, lng);
 }
-
-
