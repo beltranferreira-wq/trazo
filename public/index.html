@@ -693,9 +693,12 @@ img,svg{display:block;}
     <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlng" type="number" step="any" placeholder="Se completa solo..."></div>
   </div>
 
-  <div id="dest-map-confirm" style="display:none;height:160px;border-radius:11px;overflow:hidden;margin:-2px 0 8px;border:1.5px solid var(--line);position:relative;">
-    <div id="dest-mini-map" style="width:100%;height:100%;"></div>
-    <div style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,.9);border-radius:8px;padding:4px 8px;font-size:11px;color:#333;pointer-events:none;">Toca el mapa para ajustar</div>
+  <div id="dest-map-wrap" style="border-radius:11px;overflow:hidden;margin:6px 0 8px;border:1.5px solid var(--line);position:relative;">
+    <div id="dest-mini-map" style="width:100%;height:220px;"></div>
+    <div style="position:absolute;top:0;left:0;right:0;background:rgba(21,24,43,.82);padding:7px 12px;font-size:12px;color:#fff;font-weight:600;pointer-events:none;display:flex;align-items:center;gap:6px;">
+      <span>📍</span>
+      <span id="dest-map-label">Tocá el mapa para marcar el destino</span>
+    </div>
   </div>
   <div id="geo-status-dest"  style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
   <div id="dist-hint" style="font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;min-height:0;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;"></div>
@@ -1252,39 +1255,53 @@ let geoTimerOrigin = null;
 let destMiniMap = null;
 let destMarker  = null;
 
-function showDestMiniMap(lat, lng) {
-  const wrap = document.getElementById('dest-map-confirm');
-  const el   = document.getElementById('dest-mini-map');
-  if (!wrap || !el || typeof L === 'undefined') return;
-  wrap.style.display = 'block';
-  if (!destMiniMap) {
-    destMiniMap = L.map(el, { zoomControl:false, scrollWheelZoom:false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      { maxZoom:19, attribution:'' }).addTo(destMiniMap);
-    // Tap on map to adjust destination
-    destMiniMap.on('click', function(e) {
-      const { lat: la, lng: lo } = e.latlng;
-      document.getElementById('f-dlat').value = la.toFixed(6);
-      document.getElementById('f-dlng').value = lo.toFixed(6);
-      if (destMarker) destMarker.setLatLng([la, lo]);
-      else {
-        const mk = L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[16,16],iconAnchor:[8,8]});
-        destMarker = L.marker([la, lo], {icon:mk, draggable:true}).addTo(destMiniMap);
-        destMarker.on('dragend', function() {
-          const p = destMarker.getLatLng();
-          document.getElementById('f-dlat').value = p.lat.toFixed(6);
-          document.getElementById('f-dlng').value = p.lng.toFixed(6);
-          updateDistanceHint();
-        });
-      }
-      updateDistanceHint();
-    });
+// Default center: Ezpeleta, Quilmes (Plaza 9 de Julio area)
+const EZPELETA_CENTER = [-34.7420, -58.2230];
+
+function initDestMap() {
+  const el = document.getElementById('dest-mini-map');
+  if (!el || typeof L === 'undefined' || destMiniMap) return;
+
+  // Init map centered on Ezpeleta
+  const oLat = parseFloat(document.getElementById('f-olat').value) || EZPELETA_CENTER[0];
+  const oLng = parseFloat(document.getElementById('f-olng').value) || EZPELETA_CENTER[1];
+
+  destMiniMap = L.map(el, { zoomControl: true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { maxZoom:19, attribution:'© CARTO © OSM' }).addTo(destMiniMap);
+
+  // Show origin marker faintly
+  if (oLat && oLng) {
+    L.circleMarker([oLat, oLng], {
+      radius:7, color:'#9AA3B2', weight:2, fillColor:'#9AA3B2', fillOpacity:0.7
+    }).addTo(destMiniMap).bindPopup('Origen: ' + (document.getElementById('f-oname').value||'Local'));
+    destMiniMap.setView([oLat - 0.008, oLng + 0.008], 14);
+  } else {
+    destMiniMap.setView(EZPELETA_CENTER, 14);
   }
-  // Place/move marker
-  if (destMarker) { destMarker.setLatLng([lat, lng]); }
-  else {
-    const mk = L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[16,16],iconAnchor:[8,8]});
-    destMarker = L.marker([lat, lng], {icon:mk, draggable:true}).addTo(destMiniMap);
+
+  // Tap to set destination
+  destMiniMap.on('click', function(e) {
+    setDestMarker(e.latlng.lat, e.latlng.lng);
+    updateDistanceHint();
+  });
+
+  setTimeout(function(){ if(destMiniMap) destMiniMap.invalidateSize(); }, 300);
+}
+
+function setDestMarker(lat, lng) {
+  document.getElementById('f-dlat').value = lat.toFixed(6);
+  document.getElementById('f-dlng').value = lng.toFixed(6);
+
+  const mk = L.divIcon({
+    className:'',
+    html:'<div style="width:18px;height:18px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);"></div>',
+    iconSize:[18,18], iconAnchor:[9,9]
+  });
+  if (destMarker) {
+    destMarker.setLatLng([lat, lng]);
+  } else {
+    destMarker = L.marker([lat, lng], { icon:mk, draggable:true }).addTo(destMiniMap);
     destMarker.on('dragend', function() {
       const p = destMarker.getLatLng();
       document.getElementById('f-dlat').value = p.lat.toFixed(6);
@@ -1292,204 +1309,14 @@ function showDestMiniMap(lat, lng) {
       updateDistanceHint();
     });
   }
-  destMiniMap.setView([lat, lng], 15);
-  setTimeout(function(){ if(destMiniMap) destMiniMap.invalidateSize(); }, 200);
+  destMiniMap.panTo([lat, lng]);
+
+  // Update label
+  const lbl = document.getElementById('dest-map-label');
+  if (lbl) lbl.textContent = '✅ Destino marcado — arrastrá el pin para ajustar';
 }
 
-
-let geoTimerDest   = null;
-
-function haversineKm(lat1,lng1,lat2,lng2){
-  const R=6371,r=d=>d*Math.PI/180;
-  const dL=r(lat2-lat1),dG=r(lng2-lng1);
-  const a=Math.sin(dL/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dG/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
+function showDestMiniMap(lat, lng) {
+  if (!destMiniMap) initDestMap();
+  setDestMarker(lat, lng);
 }
-
-async function updateDistanceHint(){
-  const oLat=parseFloat(document.getElementById('f-olat')?.value);
-  const oLng=parseFloat(document.getElementById('f-olng')?.value);
-  const dLat=parseFloat(document.getElementById('f-dlat')?.value);
-  const dLng=parseFloat(document.getElementById('f-dlng')?.value);
-  const hint=document.getElementById('dist-hint');
-  if(!hint) return;
-  if(!oLat||!oLng||!dLat||!dLng){ hint.style.display='none'; return; }
-
-  // Show loading state
-  hint.textContent='🔍 Calculando distancia por calles...';
-  hint.style.color='var(--muted)';
-  hint.style.display='block';
-
-  try {
-    // Llamamos a nuestro propio servidor que hace el proxy a OSRM
-    // Así evitamos bloqueos de red en el celular del local
-    const url = `/api/route?oLat=${oLat}&oLng=${oLng}&dLat=${dLat}&dLng=${dLng}`;
-    const ctrl = new AbortController();
-    setTimeout(()=>ctrl.abort(), 10000);
-    const r = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
-    const d = await r.json();
-
-    if(d && d.km) {
-      const km = d.km;
-      const mins = Math.round(d.secs / 60);
-      const hh = Math.floor(mins/60);
-      const mm = mins % 60;
-      const timeStr = hh > 0 ? `${hh}h ${mm}min` : `${mm} min`;
-      hint.innerHTML = `🛵 <strong>${km} km</strong> por calles · ~${timeStr} estimado`;
-      hint.style.color='var(--success)';
-    hint.style.maxHeight='80px'; hint.style.padding='8px 12px';
-    } else {
-      throw new Error('Sin ruta');
-    }
-  } catch(e) {
-    // Fallback to straight-line with warning
-    const kmLineal = haversineKm(oLat,oLng,dLat,dLng);
-    hint.innerHTML = `📏 ~${kmLineal.toFixed(1)} km en línea recta <span style="color:var(--amber);font-size:10.5px;">(distancia real puede ser mayor)</span>`;
-    hint.style.color='var(--muted)';
-  hint.style.maxHeight='80px'; hint.style.padding='8px 12px';
-  }
-}
-async function geocodeAddress(address, latId, lngId, statusId) {
-  const statusEl = document.getElementById(statusId);
-  if (!address || address.trim().length < 6) return;
-  if (statusEl) { statusEl.textContent = '🔍 Buscando...'; statusEl.style.color = 'var(--muted)'; }
-
-  try {
-    const raw = address.trim();
-    // Detectar si ya incluye ciudad
-    const hasCity = /quilmes|ezpeleta|bernal|berazategui/i.test(raw);
-    const city = hasCity ? '' : 'Ezpeleta';
-
-    // Usar nuestro proxy server-side que llama a la API del gobierno argentino
-    // (más precisa que Nominatim para calles del partido de Quilmes)
-    const url = '/api/geocode?q=' + encodeURIComponent(raw) + (city ? '&city=' + encodeURIComponent(city) : '');
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 12000);
-    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
-    const d = await r.json();
-
-    if (d && d.lat && d.lng) {
-      document.getElementById(latId).value  = parseFloat(d.lat).toFixed(6);
-      document.getElementById(lngId).value  = parseFloat(d.lng).toFixed(6);
-      const src = d.source === 'georef-ar' ? '🇦🇷' : '🗺️';
-      if (statusEl) { statusEl.textContent = src + ' ' + (d.label || raw); statusEl.style.color = 'var(--success)'; }
-      if (latId === 'f-dlat') updateDistanceHint();
-    } else {
-      if (statusEl) {
-        statusEl.textContent = '⚠️ No encontrada — agregá "Ezpeleta" o el barrio';
-        statusEl.style.color = 'var(--amber)';
-      }
-    }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠️ Sin conexión para buscar'; statusEl.style.color = 'var(--muted)'; }
-  }
-}
-
-document.getElementById('f-oname').addEventListener('input', (e) => {
-  clearTimeout(geoTimerOrigin);
-  const val = e.target.value;
-  const statusEl = document.getElementById('geo-status-origin');
-  if (statusEl) statusEl.textContent = '';
-  geoTimerOrigin = setTimeout(() => geocodeAddress(val, 'f-olat', 'f-olng', 'geo-status-origin'), 900);
-});
-
-document.getElementById('f-dlat').addEventListener('change', updateDistanceHint);
-document.getElementById('f-dlng').addEventListener('change', updateDistanceHint);
-document.getElementById('f-dlat').addEventListener('change', updateDistanceHint);
-document.getElementById('f-dlng').addEventListener('change', updateDistanceHint);
-document.getElementById('f-dname').addEventListener('input', (e) => {
-  clearTimeout(geoTimerDest);
-  const val = e.target.value;
-  const statusEl = document.getElementById('geo-status-dest');
-  if (statusEl) statusEl.textContent = '';
-  geoTimerDest = setTimeout(() => geocodeAddress(val, 'f-dlat', 'f-dlng', 'geo-status-dest'), 900);
-});
-
-
-// ─── Branch selector ──────────────────────────────────────────────────────────
-var BRANCHES = {
-  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.762500', lng:'-58.216000' },
-  quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
-};
-
-// Safe branch selector setup
-(function setupBranch() {
-  try {
-    var sel = document.getElementById('f-branch');
-    if (!sel) return;
-    sel.addEventListener('change', function() {
-      var b = BRANCHES[this.value];
-      if (!b) return;
-      var n=document.getElementById('f-oname'); if(n) n.value=b.name;
-      var la=document.getElementById('f-olat');  if(la) la.value=b.lat;
-      var lo=document.getElementById('f-olng');  if(lo) lo.value=b.lng;
-      var st=document.getElementById('geo-status-origin');
-      if(st){st.textContent='✅ '+b.name;st.style.color='var(--success)';}
-    });
-  } catch(e) { console.warn('Branch selector setup:', e.message); }
-})();
-// Branch setup handled in setupBranch IIFE above
-
-
-document.getElementById('geoBtn').onclick = () => {
-  if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
-  const btn = document.getElementById('geoBtn');
-  btn.textContent = 'Obteniendo ubicación…';
-  navigator.geolocation.getCurrentPosition(pos=>{
-    document.getElementById('f-olat').value = pos.coords.latitude.toFixed(6);
-    document.getElementById('f-olng').value = pos.coords.longitude.toFixed(6);
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Ubicación actual cargada ✓`;
-    toast('Origen cargado desde tu ubicación actual');
-  }, ()=>{
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Usar mi ubicación actual como origen`;
-    toast('No se pudo obtener la ubicación. Revisá los permisos.');
-  });
-};
-
-document.getElementById('submitBtn').onclick = async () => {
-  const prod = document.getElementById('f-prod').value.trim();
-  if (!prod) { toast('El nombre del producto es obligatorio'); return; }
-  const body = {
-    product: prod,
-    carrier: document.getElementById('f-car').value,
-    tracking: document.getElementById('f-code').value,
-    recipient: document.getElementById('f-rec').value,
-    phone: document.getElementById('f-phone').value,
-    courierPhone: document.getElementById('f-courier-phone').value,
-    originName: document.getElementById('f-oname').value,
-    originLat: document.getElementById('f-olat').value,
-    originLng: document.getElementById('f-olng').value,
-    destName: document.getElementById('f-dname').value,
-    destLat: document.getElementById('f-dlat').value,
-    destLng: document.getElementById('f-dlng').value,
-  };
-  const btn = document.getElementById('submitBtn');
-  btn.textContent = 'Creando…';
-  btn.disabled = true;
-  try {
-    const s = await api.post('/api/shipments', body);
-    shipments.unshift(s);
-    closeModal();
-    renderList();
-    addNotif(s, 'Nuevo envío creado');
-    openDetail(s.id);
-    showMobileView('viewList');
-    toast('¡Envío creado! 🚀');
-  } catch(e) { toast('Error al crear el envío'); }
-  finally { btn.textContent='Crear envío'; btn.disabled=false; }
-};
-
-// ─── URL action (?action=new) ─────────────────────────────────────────────
-if (new URLSearchParams(location.search).get('action') === 'new') {
-  window.addEventListener('load', () => setTimeout(openModal, 600));
-}
-
-// ─── Init ─────────────────────────────────────────────────────────────────
-applyLayout();
-renderNotifs();
-// loadAll first thing - don't wait for anything else
-loadAll();
-
-</script>
-</body>
-</html>
