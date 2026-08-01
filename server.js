@@ -53,9 +53,9 @@ async function initDB() {
     const now = new Date();
     const d = n => new Date(now - n * 60000).toISOString();
     const seeds = [
-      { id:'s1', tracking:'TRZ0001', product:'Hamburguesa Doble + Papas + Coca', emoji:'🍔', carrier:'Juan Repartidor', recipient:'Carlos Gomez', phone:'+5491155550001', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.747042, origin_lng:-58.220667, dest_name:'Triunvirato 661, Quilmes', dest_lat:-34.7100, dest_lng:-58.2610, current_step:2, alert:null, courier_lat:-34.7150, courier_lng:-58.2570, dates:[d(35),d(20),d(8)] },
-      { id:'s2', tracking:'TRZ0002', product:'Combo Familiar x4 + Bebidas', emoji:'🍟', carrier:'Maria Repartidora', recipient:'Lucia Perez', phone:'+5491155550002', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.747042, origin_lng:-58.220667, dest_name:'San Martin 850, Quilmes', dest_lat:-34.7230, dest_lng:-58.2480, current_step:1, alert:null, courier_lat:null, dates:[d(10),null,null] },
-      { id:'s3', tracking:'TRZ0003', product:'BBQ Bacon + Cerveza Artesanal', emoji:'🍺', carrier:'Pedro Repartidor', recipient:'Martin Torres', phone:'+5491155550003', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.747042, origin_lng:-58.220667, dest_name:'Rivadavia 2200, Bernal', dest_lat:-34.7020, dest_lng:-58.2790, current_step:0, alert:null, courier_lat:null, dates:[d(3),null,null] }
+      { id:'s1', tracking:'TRZ0001', product:'Hamburguesa Doble + Papas + Coca', emoji:'🍔', carrier:'Juan Repartidor', recipient:'Carlos Gomez', phone:'+5491155550001', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.762500, origin_lng:-58.216000, dest_name:'Triunvirato 661, Quilmes', dest_lat:-34.7100, dest_lng:-58.2610, current_step:2, alert:null, courier_lat:-34.7150, courier_lng:-58.2570, dates:[d(35),d(20),d(8)] },
+      { id:'s2', tracking:'TRZ0002', product:'Combo Familiar x4 + Bebidas', emoji:'🍟', carrier:'Maria Repartidora', recipient:'Lucia Perez', phone:'+5491155550002', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.762500, origin_lng:-58.216000, dest_name:'San Martin 850, Quilmes', dest_lat:-34.7230, dest_lng:-58.2480, current_step:1, alert:null, courier_lat:null, dates:[d(10),null,null] },
+      { id:'s3', tracking:'TRZ0003', product:'BBQ Bacon + Cerveza Artesanal', emoji:'🍺', carrier:'Pedro Repartidor', recipient:'Martin Torres', phone:'+5491155550003', courier_phone:'', origin_name:'KING RESTO-BAR — Av. Mitre 1234, Quilmes', origin_lat:-34.762500, origin_lng:-58.216000, dest_name:'Rivadavia 2200, Bernal', dest_lat:-34.7020, dest_lng:-58.2790, current_step:0, alert:null, courier_lat:null, dates:[d(3),null,null] }
     ];
     for (const s of seeds) {
       await pool.query(
@@ -320,6 +320,79 @@ app.get('/api/route', async (req, res) => {
       res.status(404).json({ error: 'Sin ruta disponible' });
     }
   } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// ─── Proxy de geocodificación argentina (datos.gob.ar) ────────────────────
+// Más preciso que Nominatim para calles del partido de Quilmes/Ezpeleta
+app.get('/api/geocode', async (req, res) => {
+  const { q, city } = req.query;
+  if (!q) return res.status(400).json({ error: 'Falta dirección' });
+
+  try {
+    const https = require('https');
+    const localidad = encodeURIComponent(city || 'Ezpeleta');
+    const direccion = encodeURIComponent(q);
+
+    // 1er intento: API georef del gobierno argentino (la más precisa)
+    const georefUrl = `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${direccion}&localidad_nombre=${localidad}&provincia_nombre=Buenos+Aires&max=3`;
+
+    const georefData = await new Promise((resolve, reject) => {
+      const req2 = https.get(georefUrl, { timeout: 6000 }, (r) => {
+        let body = '';
+        r.on('data', c => body += c);
+        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      });
+      req2.on('error', reject);
+      req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
+    });
+
+    if (georefData && georefData.direcciones && georefData.direcciones.length > 0) {
+      const d = georefData.direcciones[0];
+      if (d.ubicacion) {
+        return res.json({
+          lat:     d.ubicacion.lat,
+          lng:     d.ubicacion.lon,
+          label:   d.nomenclatura || q,
+          source:  'georef-ar'
+        });
+      }
+    }
+
+    // Fallback: Nominatim con bounding box de Quilmes
+    const bbox = '-58.320,-34.700,-58.180,-34.800';
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${direccion},+${localidad},+Buenos+Aires,+Argentina&viewbox=${bbox}&bounded=1&limit=1&countrycodes=ar`;
+
+    const nomData = await new Promise((resolve, reject) => {
+      const opts = new URL(nominatimUrl);
+      const req3 = https.get({
+        hostname: opts.hostname,
+        path: opts.pathname + opts.search,
+        headers: { 'User-Agent': 'Strike-App/1.0', 'Accept-Language': 'es' },
+        timeout: 6000
+      }, (r) => {
+        let body = '';
+        r.on('data', c => body += c);
+        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      });
+      req3.on('error', reject);
+      req3.on('timeout', () => { req3.destroy(); reject(new Error('timeout')); });
+    });
+
+    if (nomData && nomData[0]) {
+      return res.json({
+        lat:    parseFloat(nomData[0].lat),
+        lng:    parseFloat(nomData[0].lon),
+        label:  nomData[0].display_name.split(',').slice(0,3).join(','),
+        source: 'nominatim'
+      });
+    }
+
+    res.status(404).json({ error: 'Dirección no encontrada' });
+  } catch(e) {
+    console.error('Geocode error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
