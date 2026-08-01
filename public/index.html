@@ -1300,27 +1300,63 @@ async function updateDistanceHint(){
 async function geocodeAddress(address, latId, lngId, statusId) {
   const statusEl = document.getElementById(statusId);
   if (!address || address.trim().length < 6) return;
-  if (statusEl) statusEl.textContent = '🔍 Buscando...';
+  if (statusEl) { statusEl.textContent = '🔍 Buscando...'; statusEl.style.color = 'var(--muted)'; }
+
   try {
-    // Forzar contexto Ezpeleta para mejor geocodificación local
     const raw = address.trim();
-    // Si no mencionan ciudad, agregamos Ezpeleta/Quilmes para mayor precisión
-    const hasCity = /quilmes|ezpeleta|bernal|berazategui|lanús|avellaneda/i.test(raw);
-    const query = hasCity
-      ? raw + ', Provincia de Buenos Aires, Argentina'
-      : raw + ', Ezpeleta, Quilmes, Buenos Aires, Argentina';
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ar`,
-      { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' } }
-    );
-    const d = await r.json();
-    if (d && d[0]) {
-      document.getElementById(latId).value = parseFloat(d[0].lat).toFixed(6);
-      document.getElementById(lngId).value = parseFloat(d[0].lon).toFixed(6);
-      if (statusEl) { statusEl.textContent = '✅ ' + d[0].display_name.split(',').slice(0,2).join(','); statusEl.style.color = 'var(--success)'; }
-      if (latId === 'f-dlat') { updateDistanceHint(); }
+    // Detect "Street Number" pattern
+    const m = raw.match(/^([^\d]+?)\s+(\d+)\s*,?\s*(.*)$/);
+    let result = null;
+
+    if (m) {
+      const street = m[1].trim();
+      const number = m[2];
+      const rest   = m[3].trim();
+      const hasCity = /quilmes|ezpeleta|bernal|berazategui/i.test(rest);
+      const city    = hasCity ? rest : 'Ezpeleta';
+
+      // Attempt 1: Structured Nominatim (most accurate for Argentine streets)
+      const url1 = 'https://nominatim.openstreetmap.org/search?format=json'
+        + '&street=' + encodeURIComponent(street + ' ' + number)
+        + '&city=' + encodeURIComponent(city)
+        + '&county=Quilmes&state=Buenos+Aires&country=Argentina&limit=3';
+      const r1 = await fetch(url1, {
+        headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' },
+        cache: 'no-store'
+      });
+      const d1 = await r1.json();
+      if (d1 && d1[0]) {
+        result = d1[0];
+      } else {
+        // Attempt 2: free text with forced city context
+        const q = street + ' ' + number + ', ' + city + ', Quilmes, Buenos Aires, Argentina';
+        const r2 = await fetch(
+          'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&limit=3&countrycodes=ar',
+          { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' }, cache: 'no-store' }
+        );
+        const d2 = await r2.json();
+        if (d2 && d2[0]) result = d2[0];
+      }
     } else {
-      if (statusEl) { statusEl.textContent = '⚠️ No encontrada — revisá la dirección'; statusEl.style.color = 'var(--amber)'; }
+      // No street number pattern - free text search
+      const hasCity = /quilmes|ezpeleta/i.test(raw);
+      const q = hasCity ? raw + ', Buenos Aires, Argentina' : raw + ', Ezpeleta, Quilmes, Buenos Aires, Argentina';
+      const r = await fetch(
+        'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=ar',
+        { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' }, cache: 'no-store' }
+      );
+      const d = await r.json();
+      if (d && d[0]) result = d[0];
+    }
+
+    if (result) {
+      document.getElementById(latId).value  = parseFloat(result.lat).toFixed(6);
+      document.getElementById(lngId).value  = parseFloat(result.lon).toFixed(6);
+      const label = result.display_name.split(',').slice(0, 3).join(',');
+      if (statusEl) { statusEl.textContent = '✅ ' + label; statusEl.style.color = 'var(--success)'; }
+      if (latId === 'f-dlat') updateDistanceHint();
+    } else {
+      if (statusEl) { statusEl.textContent = '⚠️ No encontrada — agregá "Ezpeleta" o "Quilmes"'; statusEl.style.color = 'var(--amber)'; }
     }
   } catch(e) {
     if (statusEl) { statusEl.textContent = '⚠️ Sin conexión para buscar'; statusEl.style.color = 'var(--muted)'; }
