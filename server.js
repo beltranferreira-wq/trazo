@@ -325,77 +325,98 @@ app.get('/api/route', async (req, res) => {
 });
 
 
-// ─── Proxy de geocodificación argentina (datos.gob.ar) ────────────────────
-// Más preciso que Nominatim para calles del partido de Quilmes/Ezpeleta
+// ─── Proxy de geocodificación con filtro de proximidad ────────────────────
+function haversineKmServer(lat1, lng1, lat2, lng2) {
+  const R = 6371, r = d => d * Math.PI / 180;
+  const dL = r(lat2-lat1), dG = r(lng2-lng1);
+  const a = Math.sin(dL/2)**2 + Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dG/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 app.get('/api/geocode', async (req, res) => {
-  const { q, city } = req.query;
+  const { q, oLat, oLng } = req.query;
   if (!q) return res.status(400).json({ error: 'Falta dirección' });
+
+  // Coordenadas de referencia del local (para elegir el resultado más cercano)
+  const refLat = parseFloat(oLat) || -34.7625;
+  const refLng = parseFloat(oLng) || -58.2160;
 
   try {
     const https = require('https');
-    const localidad = encodeURIComponent(city || 'Ezpeleta');
-    const direccion = encodeURIComponent(q);
 
-    // 1er intento: API georef del gobierno argentino (la más precisa)
-    const georefUrl = `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${direccion}&localidad_nombre=${localidad}&provincia_nombre=Buenos+Aires&max=3`;
-
-    const georefData = await new Promise((resolve, reject) => {
-      const req2 = https.get(georefUrl, { timeout: 6000 }, (r) => {
-        let body = '';
-        r.on('data', c => body += c);
-        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+    async function httpGet(url) {
+      return new Promise((resolve, reject) => {
+        const req2 = https.get(url, {
+          timeout: 8000,
+          headers: { 'User-Agent': 'Strike-App/1.0', 'Accept-Language': 'es' }
+        }, (r) => {
+          let body = '';
+          r.on('data', c => body += c);
+          r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+        });
+        req2.on('error', reject);
+        req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
       });
-      req2.on('error', reject);
-      req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
-    });
+    }
 
-    if (georefData && georefData.direcciones && georefData.direcciones.length > 0) {
-      const d = georefData.direcciones[0];
-      if (d.ubicacion) {
-        return res.json({
-          lat:     d.ubicacion.lat,
-          lng:     d.ubicacion.lon,
-          label:   d.nomenclatura || q,
-          source:  'georef-ar'
+    let candidates = [];
+
+    // Intento 1: georef-ar con departamento Quilmes (devuelve hasta 10 resultados)
+    try {
+      const d = await httpGet(
+        `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${encodeURIComponent(q)}&departamento_nombre=Quilmes&provincia_nombre=Buenos+Aires&max=10`
+      );
+      if (d && d.direcciones) {
+        d.direcciones.forEach(r => {
+          if (r.ubicacion) candidates.push({
+            lat: r.ubicacion.lat, lng: r.ubicacion.lon,
+            label: r.nomenclatura || q, source: 'georef-ar'
+          });
         });
       }
+    } catch(e) { console.log('georef error:', e.message); }
+
+    // Intento 2: Nominatim con bbox de Quilmes (devuelve hasta 5 resultados)
+    if (candidates.length === 0) {
+      try {
+        const bbox = '-58.350,-34.650,-58.150,-34.850';
+        const d = await httpGet(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+', Quilmes, Buenos Aires, Argentina')}&viewbox=${bbox}&bounded=1&limit=5&countrycodes=ar`
+        );
+        if (d) d.forEach(r => candidates.push({
+          lat: parseFloat(r.lat), lng: parseFloat(r.lon),
+          label: r.display_name.split(',').slice(0,3).join(','), source: 'nominatim'
+        }));
+      } catch(e) { console.log('nominatim error:', e.message); }
     }
 
-    // Fallback: Nominatim con bounding box de Quilmes
-    const bbox = '-58.320,-34.700,-58.180,-34.800';
-    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${direccion},+${localidad},+Buenos+Aires,+Argentina&viewbox=${bbox}&bounded=1&limit=1&countrycodes=ar`;
-
-    const nomData = await new Promise((resolve, reject) => {
-      const opts = new URL(nominatimUrl);
-      const req3 = https.get({
-        hostname: opts.hostname,
-        path: opts.pathname + opts.search,
-        headers: { 'User-Agent': 'Strike-App/1.0', 'Accept-Language': 'es' },
-        timeout: 6000
-      }, (r) => {
-        let body = '';
-        r.on('data', c => body += c);
-        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
-      });
-      req3.on('error', reject);
-      req3.on('timeout', () => { req3.destroy(); reject(new Error('timeout')); });
-    });
-
-    if (nomData && nomData[0]) {
-      return res.json({
-        lat:    parseFloat(nomData[0].lat),
-        lng:    parseFloat(nomData[0].lon),
-        label:  nomData[0].display_name.split(',').slice(0,3).join(','),
-        source: 'nominatim'
-      });
+    if (candidates.length === 0) {
+      return res.status(404).json({ error: 'Dirección no encontrada' });
     }
 
-    res.status(404).json({ error: 'Dirección no encontrada' });
+    // Filtrar resultados dentro de 20km del local
+    const nearby = candidates.filter(c =>
+      haversineKmServer(refLat, refLng, c.lat, c.lng) < 20
+    );
+
+    // Elegir el más cercano al local
+    const pool = nearby.length > 0 ? nearby : candidates;
+    pool.sort((a, b) =>
+      haversineKmServer(refLat, refLng, a.lat, a.lng) -
+      haversineKmServer(refLat, refLng, b.lat, b.lng)
+    );
+
+    const best = pool[0];
+    const distKm = haversineKmServer(refLat, refLng, best.lat, best.lng).toFixed(1);
+    console.log(`Geocode "${q}": ${best.lat},${best.lng} (${distKm}km del local) [${best.source}]`);
+
+    res.json(best);
   } catch(e) {
     console.error('Geocode error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
+
 
 app.get('/health', (req, res) => res.json({ status:'ok' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname,'public','index.html')));
