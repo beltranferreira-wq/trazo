@@ -693,7 +693,11 @@ img,svg{display:block;}
     <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlng" type="number" step="any" placeholder="Se completa solo..."></div>
   </div>
 
-  <div id="geo-status-dest" style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
+  <div id="dest-map-confirm" style="display:none;height:160px;border-radius:11px;overflow:hidden;margin:-2px 0 8px;border:1.5px solid var(--line);position:relative;">
+    <div id="dest-mini-map" style="width:100%;height:100%;"></div>
+    <div style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,.9);border-radius:8px;padding:4px 8px;font-size:11px;color:#333;pointer-events:none;">Toca el mapa para ajustar</div>
+  </div>
+  <div id="geo-status-dest"  style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
   <div id="dist-hint" style="font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;min-height:0;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;"></div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
@@ -1245,6 +1249,54 @@ document.getElementById('cancelBtn').onclick = closeModal;
 
 // ─── Geocodificación automática de direcciones ────────────────────────────
 let geoTimerOrigin = null;
+let destMiniMap = null;
+let destMarker  = null;
+
+function showDestMiniMap(lat, lng) {
+  const wrap = document.getElementById('dest-map-confirm');
+  const el   = document.getElementById('dest-mini-map');
+  if (!wrap || !el || typeof L === 'undefined') return;
+  wrap.style.display = 'block';
+  if (!destMiniMap) {
+    destMiniMap = L.map(el, { zoomControl:false, scrollWheelZoom:false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      { maxZoom:19, attribution:'' }).addTo(destMiniMap);
+    // Tap on map to adjust destination
+    destMiniMap.on('click', function(e) {
+      const { lat: la, lng: lo } = e.latlng;
+      document.getElementById('f-dlat').value = la.toFixed(6);
+      document.getElementById('f-dlng').value = lo.toFixed(6);
+      if (destMarker) destMarker.setLatLng([la, lo]);
+      else {
+        const mk = L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+        destMarker = L.marker([la, lo], {icon:mk, draggable:true}).addTo(destMiniMap);
+        destMarker.on('dragend', function() {
+          const p = destMarker.getLatLng();
+          document.getElementById('f-dlat').value = p.lat.toFixed(6);
+          document.getElementById('f-dlng').value = p.lng.toFixed(6);
+          updateDistanceHint();
+        });
+      }
+      updateDistanceHint();
+    });
+  }
+  // Place/move marker
+  if (destMarker) { destMarker.setLatLng([lat, lng]); }
+  else {
+    const mk = L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+    destMarker = L.marker([lat, lng], {icon:mk, draggable:true}).addTo(destMiniMap);
+    destMarker.on('dragend', function() {
+      const p = destMarker.getLatLng();
+      document.getElementById('f-dlat').value = p.lat.toFixed(6);
+      document.getElementById('f-dlng').value = p.lng.toFixed(6);
+      updateDistanceHint();
+    });
+  }
+  destMiniMap.setView([lat, lng], 15);
+  setTimeout(function(){ if(destMiniMap) destMiniMap.invalidateSize(); }, 200);
+}
+
+
 let geoTimerDest   = null;
 
 function haversineKm(lat1,lng1,lat2,lng2){
