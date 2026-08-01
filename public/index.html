@@ -677,8 +677,8 @@ img,svg{display:block;}
     <input type="hidden" id="f-oname" value="KING RESTO-BAR — Esquel 1399, Ezpeleta">
   </div>
   <div class="frow">
-    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.747042"></div>
-    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.220667"></div>
+    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.762500"></div>
+    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.216000"></div>
   </div>
   <p style="font-size:11px;color:var(--muted);margin:-8px 0 8px;padding:0 2px;">💡 Las coordenadas mejoran el mapa. Podés usar el botón de abajo o dejarlas vacías — el sistema las busca automáticamente por la dirección.</p>
       <button class="btn-geo" id="geoBtn">
@@ -1236,8 +1236,8 @@ function closeModal() {
   const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
   const dbr = document.getElementById('f-branch'); if(dbr) dbr.value='esquel';
   const dn = document.getElementById('f-oname'); if(dn) dn.value='KING RESTO-BAR — Esquel 1399, Ezpeleta';
-  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.747042';
-  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.220667';
+  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.762500';
+  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.216000';
 }
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
@@ -1302,75 +1302,25 @@ async function geocodeAddress(address, latId, lngId, statusId) {
   if (!address || address.trim().length < 6) return;
   if (statusEl) { statusEl.textContent = '🔍 Buscando...'; statusEl.style.color = 'var(--muted)'; }
 
-  // Bounding box de Ezpeleta/Quilmes (limita la búsqueda a esta zona exacta)
-  // sur=-34.800, norte=-34.700, oeste=-58.320, este=-58.180
-  const VIEWBOX = '-58.320,-34.700,-58.180,-34.800';
-  const BOUNDED = '1'; // solo resultados dentro del viewbox
-
   try {
     const raw = address.trim();
-    const m = raw.match(/^([^\d]+?)\s+(\d+)\s*,?\s*(.*)$/);
-    let result = null;
+    // Detectar si ya incluye ciudad
+    const hasCity = /quilmes|ezpeleta|bernal|berazategui/i.test(raw);
+    const city = hasCity ? '' : 'Ezpeleta';
 
-    if (m) {
-      const street = m[1].trim();
-      const number = m[2];
-      const rest   = m[3].trim();
+    // Usar nuestro proxy server-side que llama a la API del gobierno argentino
+    // (más precisa que Nominatim para calles del partido de Quilmes)
+    const url = '/api/geocode?q=' + encodeURIComponent(raw) + (city ? '&city=' + encodeURIComponent(city) : '');
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 12000);
+    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+    const d = await r.json();
 
-      // Intento 1: Structured + bounded viewbox (más preciso)
-      const url1 = 'https://nominatim.openstreetmap.org/search?format=json'
-        + '&street=' + encodeURIComponent(street + ' ' + number)
-        + '&county=Quilmes&state=Buenos+Aires&country=Argentina'
-        + '&viewbox=' + VIEWBOX + '&bounded=' + BOUNDED
-        + '&limit=3';
-      const r1 = await fetch(url1, {
-        headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' },
-        cache: 'no-store'
-      });
-      const d1 = await r1.json();
-      if (d1 && d1[0]) {
-        result = d1[0];
-      } else {
-        // Intento 2: texto libre + bounded viewbox
-        const q = street + ' ' + number + ', Quilmes, Buenos Aires, Argentina';
-        const r2 = await fetch(
-          'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q)
-          + '&viewbox=' + VIEWBOX + '&bounded=' + BOUNDED
-          + '&limit=3&countrycodes=ar',
-          { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' }, cache: 'no-store' }
-        );
-        const d2 = await r2.json();
-        if (d2 && d2[0]) result = d2[0];
-      }
-
-      if (!result) {
-        // Intento 3: sin bounded (por si la calle no está en OSM de la zona)
-        const q3 = street + ' ' + number + ', Ezpeleta, Quilmes, Buenos Aires, Argentina';
-        const r3 = await fetch(
-          'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q3)
-          + '&limit=3&countrycodes=ar',
-          { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' }, cache: 'no-store' }
-        );
-        const d3 = await r3.json();
-        if (d3 && d3[0]) result = d3[0];
-      }
-    } else {
-      const q = raw + ', Ezpeleta, Quilmes, Buenos Aires, Argentina';
-      const r = await fetch(
-        'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q)
-        + '&viewbox=' + VIEWBOX + '&bounded=' + BOUNDED
-        + '&limit=1&countrycodes=ar',
-        { headers: { 'Accept-Language': 'es', 'User-Agent': 'Strike-App/1.0' }, cache: 'no-store' }
-      );
-      const d = await r.json();
-      if (d && d[0]) result = d[0];
-    }
-
-    if (result) {
-      document.getElementById(latId).value  = parseFloat(result.lat).toFixed(6);
-      document.getElementById(lngId).value  = parseFloat(result.lon).toFixed(6);
-      const label = result.display_name.split(',').slice(0, 3).join(',');
-      if (statusEl) { statusEl.textContent = '✅ ' + label; statusEl.style.color = 'var(--success)'; }
+    if (d && d.lat && d.lng) {
+      document.getElementById(latId).value  = parseFloat(d.lat).toFixed(6);
+      document.getElementById(lngId).value  = parseFloat(d.lng).toFixed(6);
+      const src = d.source === 'georef-ar' ? '🇦🇷' : '🗺️';
+      if (statusEl) { statusEl.textContent = src + ' ' + (d.label || raw); statusEl.style.color = 'var(--success)'; }
       if (latId === 'f-dlat') updateDistanceHint();
     } else {
       if (statusEl) {
@@ -1406,7 +1356,7 @@ document.getElementById('f-dname').addEventListener('input', (e) => {
 
 // ─── Branch selector ──────────────────────────────────────────────────────────
 var BRANCHES = {
-  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.747042', lng:'-58.220667' },
+  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta',    lat:'-34.762500', lng:'-58.216000' },
   quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
 };
 
