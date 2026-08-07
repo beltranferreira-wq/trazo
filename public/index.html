@@ -2,27 +2,19 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#15182B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Strike">
-<link rel="apple-touch-icon" href="/icons/icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96.png">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Seguí tu pedido en tiempo real con GPS del repartidor">
+<meta name="description" content="Seguí tus envíos en tiempo real con GPS del transportista">
 <link rel="manifest" href="/manifest.json">
-
-
-
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
 <title>Strike — Delivery en tiempo real</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -547,7 +539,7 @@ img,svg{display:block;}
     <div class="brand-mark">
       <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
     </div>
-    <div class="brand"><b>Strike</b><span>Delivery en tiempo real</span></div>
+    <div class="brand"><b>Strike</b><span>Seguimiento de envíos</span></div>
     <div class="topbar-btns">
       <button class="iBtn" id="notifMobileBtn">
         <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -570,9 +562,9 @@ img,svg{display:block;}
   <aside class="sidebar" style="display:none" id="sidebar">
     <div class="sidebar-header">
       <div class="brand-mark">
-        <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="9" width="28" height="6" rx="3" fill="#FF5A36"/><rect x="15" y="15" width="6" height="17" rx="3" fill="#ffffff"/><circle cx="28" cy="28" r="4" fill="#FF5A36"/><circle cx="24" cy="24" r="2.5" fill="#FF5A36" opacity="0.55"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
       </div>
-      <div class="sidebar-title"><b>Strike</b><span>Delivery en tiempo real</span></div>
+      <div class="sidebar-title"><b>Strike</b><span>Seguimiento de envíos</span></div>
       <button class="iBtn" id="notifDeskBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-pip" id="notifDot2" style="display:none">0</span>
@@ -655,7 +647,7 @@ img,svg{display:block;}
 <div class="modal-sheet" id="modalSheet">
   <div class="modal-drag"></div>
   <h2 class="modal-h">Nuevo envío</h2>
-  <p class="modal-sub">Ingresá los datos del pedido para compartir el seguimiento en vivo con el cliente.</p>
+  <p class="modal-sub">Completá los datos del pedido para empezar el seguimiento.</p>
 
   <div class="fsec">Producto</div>
   <div class="fg"><label>Nombre del producto *</label><input id="f-prod" placeholder="Ej: Hamburguesa Doble + Papas" autocomplete="off" value="KING RESTO-BAR"></div>
@@ -666,24 +658,15 @@ img,svg{display:block;}
   <div class="frow">
     <div class="fg"><label>Destinatario</label><input id="f-rec" placeholder="Nombre completo"></div>
     <div class="fg"><label>WhatsApp del cliente</label><input id="f-phone" type="tel" placeholder="+549..."></div>
-      <div class="fg"><label>WhatsApp del repartidor</label><input id="f-courier-phone" type="tel" placeholder="+549..."></div>
   </div>
 
   <div class="fsec">Punto de origen</div>
-  <div class="fg">
-    <label>Sucursal de despacho * <span style="font-size:10px;color:var(--muted);font-weight:400;">— usá 📍 para coordenadas exactas</span></label>
-    <select id="f-branch" style="width:100%;border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;font-size:15px;color:var(--ink);background:var(--surface);-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\'><path fill=\' %236B7180\' d=\'M7 10l5 5 5-5z\'/></svg>');background-repeat:no-repeat;background-position:right 12px center;">
-      <option value="esquel">📍 Esquel 1399, Ezpeleta</option>
-      <option value="quilmes">📍 Triunvirato 661, Quilmes</option>
-    </select>
-    <input type="hidden" id="f-oname" value="KING RESTO-BAR — Esquel 1399, Ezpeleta">
-  </div>
+  <div class="fg"><label>Nombre del local / depósito *</label><input id="f-oname" placeholder="Ej: Local — Dirección" value="KING RESTO-BAR — Esquel 1399, Ezpeleta"></div>
   <div class="frow">
-    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olat" type="number" step="any" placeholder="Se completa solo..." value="-34.762500"></div>
-    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-olng" type="number" step="any" placeholder="Se completa solo..." value="-58.216000"></div>
+    <div class="fg"><label>Latitud</label><input id="f-olat" type="number" step="any" placeholder="-34.7625" value="-34.7625" style="font-size:13px;"></div>
+    <div class="fg"><label>Longitud</label><input id="f-olng" type="number" step="any" placeholder="-58.2160" value="-58.2160"></div>
   </div>
-  <p style="font-size:11px;color:var(--muted);margin:-8px 0 8px;padding:0 2px;">💡 Las coordenadas mejoran el mapa. Podés usar el botón de abajo o dejarlas vacías — el sistema las busca automáticamente por la dirección.</p>
-      <button class="btn-geo" id="geoBtn">
+  <button class="btn-geo" id="geoBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg>
     Usar mi ubicación actual como origen
   </button>
@@ -691,19 +674,12 @@ img,svg{display:block;}
   <div class="fsec">Destino de entrega</div>
   <div class="fg"><label>Dirección completa del cliente *</label><input id="f-dname" placeholder="Ej: Av. Rivadavia 4521, 3°B — CABA"></div>
   <div class="frow">
-    <div class="fg"><label>Latitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlat" type="number" step="any" placeholder="Se completa solo..."></div>
-    <div class="fg"><label>Longitud <span style="color:var(--success);font-size:10px;">auto</span></label><input id="f-dlng" type="number" step="any" placeholder="Se completa solo..."></div>
+    <div class="fg"><label>Latitud</label><input id="f-dlat" type="number" step="any" placeholder="-34.6217"></div>
+    <div class="fg"><label>Longitud</label><input id="f-dlng" type="number" step="any" placeholder="-58.4341"></div>
   </div>
 
-  <div id="dest-map-wrap" style="border-radius:11px;overflow:hidden;margin:6px 0 8px;border:1.5px solid var(--line);position:relative;">
-    <div id="dest-mini-map" style="width:100%;height:220px;"></div>
-    <div style="position:absolute;top:0;left:0;right:0;background:rgba(21,24,43,.82);padding:7px 12px;font-size:12px;color:#fff;font-weight:600;pointer-events:none;display:flex;align-items:center;gap:6px;">
-      <span>📍</span>
-      <span id="dest-map-label">Tocá el mapa para marcar el destino</span>
-    </div>
-  </div>
-  <div id="geo-status-dest"  style="font-size:11px;color:var(--muted);min-height:16px;margin:-4px 0 4px;transition:color .3s;"></div>
-  <div id="dist-hint" style="font-size:12.5px;font-weight:600;background:var(--success-soft);color:var(--success);border-radius:9px;padding:8px 12px;margin-bottom:6px;min-height:0;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;"></div>
+  <div id="geo-status-dest" style="font-size:11.5px;min-height:16px;margin:-4px 0 6px;"></div>
+  <div id="dist-hint" style="display:none;background:#DCF1E6;color:#1A7C4A;border-radius:10px;padding:9px 13px;font-size:13px;font-weight:600;margin-bottom:8px;"></div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
     <button class="btn-cancel" id="cancelBtn">Cancelar</button>
@@ -713,46 +689,9 @@ img,svg{display:block;}
 <!-- ── TOAST ── -->
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-</head>
-<body>
-<!-- TEMP FIX -->
-
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 'use strict';
-
-// Load Leaflet dynamically - non-blocking, app works without it
-function loadLeaflet(cb) {
-  if (typeof L !== 'undefined') { if(cb) cb(); return; }
-  // Load CSS first
-  if (!document.getElementById('leaflet-css')) {
-    const css = document.createElement('link');
-    css.id = 'leaflet-css';
-    css.rel = 'stylesheet';
-    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(css);
-  }
-  const script = document.createElement('script');
-  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-  script.crossOrigin = '';
-  script.onload = function() { if(cb) cb(); };
-  script.onerror = function() {
-    // Fallback: try cdnjs
-    const s2 = document.createElement('script');
-    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
-    s2.onload = function() { if(cb) cb(); };
-    s2.onerror = function() {
-      // Last fallback: local vendor
-      const s3 = document.createElement('script');
-      s3.src = '/vendor/leaflet/leaflet.js';
-      s3.onload = function() { if(cb) cb(); };
-      document.head.appendChild(s3);
-    };
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(script);
-}
 
 // ─── Service Worker ────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -764,12 +703,9 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
-  // Always show install banner (don't check dismissed state)
-  document.getElementById('installBanner').classList.add('show');
-});
-window.addEventListener('appinstalled', () => {
-  document.getElementById('installBanner').classList.remove('show');
-  deferredPrompt = null;
+  if (!localStorage.getItem('installDismissed')) {
+    document.getElementById('installBanner').classList.add('show');
+  }
 });
 document.getElementById('installBtn').onclick = async () => {
   if (!deferredPrompt) return;
@@ -859,13 +795,6 @@ function badge(s) {
   if (s.currentStep===1) return { t:'🛵 En camino', c:'b-accent' };
   return { t:'🍔 En preparación', c:'b-amber' };
 }
-function waUrlCourier(s) {
-  const live = `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
-  const txt = `🛵 *Strike* — Activá el GPS para este pedido:\n\n*${s.product}*\nCliente: ${s.recipient}\nDestino: ${s.destName||'ver en el mapa'}\n\n${live}\n\n👆 Abrí el link y tocá "Soy el repartidor — Activar GPS"`;
-  const ph = (s.courierPhone||'').replace(/\D/g,'');
-  return ph ? `https://wa.me/${ph}?text=${encodeURIComponent(txt)}`
-            : `https://wa.me/?text=${encodeURIComponent(txt)}`;
-}
 function waUrl(s) {
   const live = `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
   const txt = `🚚 *Strike* — Seguí tu pedido en tiempo real:\n\n📦 *${s.product}*\nCódigo: \`${s.tracking}\`\n\n${live}`;
@@ -874,7 +803,7 @@ function waUrl(s) {
             : `https://wa.me/?text=${encodeURIComponent(txt)}`;
 }
 function liveUrl(s) {
-  return `${location.origin}/share/${encodeURIComponent(s.tracking)}`;
+  return `${location.origin}/live.html?code=${encodeURIComponent(s.tracking)}`;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────
@@ -887,48 +816,13 @@ const api = {
 
 // ─── Load shipments ───────────────────────────────────────────────────────
 async function loadAll() {
-  const meta = document.getElementById('listMeta');
-  const cards = document.getElementById('scards');
-  if (meta) meta.textContent = 'Conectando...';
-  if (cards) cards.innerHTML = `<div class="empty-state" style="padding-top:60px;">
-    <div style="font-size:36px;margin-bottom:12px;animation:spin 2s linear infinite;">⏳</div>
-    <h2>Iniciando servidor...</h2>
-    <p style="font-size:13px;">El servidor puede tardar hasta 50 segundos en despertar.<br>Esperá un momento...</p>
-  </div>`;
-  
-  // Try up to 3 times with increasing waits
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000); // 20s each attempt
-      const r = await fetch('/api/shipments?t=' + Date.now(), { 
-        signal: controller.signal,
-        cache: 'no-store'
-      });
-      clearTimeout(timeout);
-      if (!r.ok) throw new Error('Error ' + r.status);
-      shipments = await r.json();
-      renderList();
-      return;
-    } catch(e) {
-      if (attempt < 3) {
-        if (cards) cards.innerHTML = `<div class="empty-state" style="padding-top:60px;">
-          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
-          <h2>Iniciando... (${attempt}/3)</h2>
-          <p style="font-size:13px;">El servidor está despertando, aguantá un poco más...</p>
-        </div>`;
-        await new Promise(r => setTimeout(r, 5000)); // wait 5s between attempts
-      } else {
-        shipments = [];
-        if (cards) cards.innerHTML = `<div class="empty-state">
-          <h2>Sin conexión</h2>
-          <p>No se pudo conectar al servidor.</p>
-          <button class="empty-cta" onclick="loadAll()">🔄 Reintentar</button>
-        </div>`;
-        if (meta) meta.textContent = 'Sin conexión';
-      }
-    }
+  try {
+    shipments = await api.get('/api/shipments');
+  } catch(e) {
+    toast('Sin conexión — mostrando caché');
+    shipments = [];
   }
+  renderList();
 }
 
 // ─── Render list ──────────────────────────────────────────────────────────
@@ -945,7 +839,7 @@ function renderList(q='') {
   if (!fl.length) {
     wrap.innerHTML = `<div class="empty-state">
       <h2>${shipments.length ? 'Sin resultados' : '¡Empezá ahora!'}</h2>
-      <p>${shipments.length ? 'Probá con otra búsqueda.' : 'Creá un nuevo pedido y compartí el link de seguimiento con tu cliente por WhatsApp.'}</p>
+      <p>${shipments.length ? 'Probá con otra búsqueda.' : 'Creá tu primer envío y compartí el seguimiento en tiempo real con el transportista y el cliente.'}</p>
       ${!shipments.length ? `<button class="empty-cta" id="emptyCta">+ Crear primer envío</button>` : ''}
     </div>`;
     document.getElementById('emptyCta')?.addEventListener('click', openModal);
@@ -963,7 +857,7 @@ function renderList(q='') {
         <div class="scard-recip">${s.recipient}${s.originName?' · '+s.originName.split('—')[0].trim():''}</div>
         <span class="badge ${b.c}">${b.t}</span>
       </div>
-      <a class="share-pill" href="${wa}" target="_blank" rel="noopener" aria-label="Enviar link al cliente por WhatsApp"
+      <a class="share-pill" href="${wa}" target="_blank" rel="noopener" aria-label="Enviar por WhatsApp"
          onclick="event.stopPropagation()">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
       </a>
@@ -1039,8 +933,8 @@ function renderDetail(s) {
     ? `<div class="alert-box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>${s.alert}</div>` : '';
 
   const advHtml = s.currentStep < 5
-    ? `<button class="btn-advance" id="advBtn">${STEPS[s.currentStep+1]} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
-    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> ✅ Pedido entregado</div>`;
+    ? `<button class="btn-advance" id="advBtn">Avanzar a «${STEPS[s.currentStep+1]}» <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>`
+    : `<div class="delivered-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg> Entregado correctamente</div>`;
 
   document.getElementById('detailContent').innerHTML = `
     <div class="dcard-top">
@@ -1074,8 +968,7 @@ function renderDetail(s) {
       <div class="block-label">Destinatario</div>
       <div class="info-grid">
         <div class="ii"><div class="ii-l">Nombre</div><div class="ii-v">${s.recipient||'—'}</div></div>
-        <div class="ii"><div class="ii-l">WhatsApp cliente</div><div class="ii-v">${s.phone||'—'}</div></div>
-        <div class="ii"><div class="ii-l">WhatsApp repartidor</div><div class="ii-v">${s.courierPhone||'—'}</div></div>
+        <div class="ii"><div class="ii-l">WhatsApp</div><div class="ii-v">${s.phone||'—'}</div></div>
       </div>
     </div>
 
@@ -1083,11 +976,7 @@ function renderDetail(s) {
       ${advHtml}
       <a class="btn-wa-big" id="waClientBtn" href="${waUrl(s)}" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
-        📱 Enviar link al cliente
-      </a>
-      <a class="btn-wa-big" id="waCourierBtn" href="${waUrlCourier(s)}" target="_blank" rel="noopener" style="background:#15182B;">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h8M8 12.5h5"/></svg>
-        🛵 Enviar GPS al repartidor
+        Enviar seguimiento al cliente
       </a>
       <button class="btn-copy-link" id="copyLinkBtn">
         <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
@@ -1103,78 +992,37 @@ function renderDetail(s) {
   document.getElementById('copyCodeBtn').onclick = () =>
     navigator.clipboard.writeText(s.tracking).then(()=>toast('Código copiado ✓')).catch(()=>{});
   document.getElementById('copyLinkBtn').onclick = () =>
-    navigator.clipboard.writeText(`${location.origin}/share/${encodeURIComponent(s.tracking)}`).then(()=>toast('Enlace copiado ✓')).catch(()=>{});
+    navigator.clipboard.writeText(liveUrl(s)).then(()=>toast('Enlace copiado ✓')).catch(()=>{});
   document.getElementById('advBtn')?.addEventListener('click', () => advanceStep(s.id));
   document.getElementById('delBtn').onclick = () => deleteShipment(s.id);
 }
 
-async function initDetailMap(s) {
+function initDetailMap(s) {
   const el = document.getElementById('detailMap');
   if (!el || !el.offsetHeight) { setTimeout(()=>initDetailMap(s),200); return; }
-  if (typeof L === 'undefined') {
-    loadLeaflet(function() { initDetailMap(s); });
-    return;
-  }
   try {
-    if (typeof L === 'undefined') return;
     detailMap = L.map(el, { scrollWheelZoom:false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      { maxZoom:19, attribution:'© <a href="https://carto.com">CARTO</a>' }
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom:19, attribution:'© <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
     ).addTo(detailMap);
 
-    const mkOr = L.divIcon({className:'',html:'<div style="width:13px;height:13px;border-radius:50%;background:#9AA3B2;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>',iconSize:[13,13],iconAnchor:[6,6]});
-    const mkDt = L.divIcon({className:'',html:'<div style="width:15px;height:15px;border-radius:50%;background:#15182B;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[15,15],iconAnchor:[7,7]});
-    const mkCr = L.divIcon({className:'',html:'<div style="width:15px;height:15px;border-radius:50%;background:#FF5A36;border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></div>',iconSize:[15,15],iconAnchor:[7,7]});
+    const mkOr = L.divIcon({className:'',html:'<div class="pin-or"></div>',iconSize:[12,12],iconAnchor:[6,6]});
+    const mkDt = L.divIcon({className:'',html:'<div class="pin-dt"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+    const mkCr = L.divIcon({className:'',html:'<div class="pin-cw"><div class="pin-pulse"></div><div class="pin-c"></div></div>',iconSize:[22,22],iconAnchor:[11,11]});
 
-    if (s.originLat) detailMarkers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(detailMap).bindPopup(s.originName||'Origen');
-    if (s.destLat)   detailMarkers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(detailMap).bindPopup(s.destName||'Destino');
+    detailMarkers.origin = L.marker([s.originLat,s.originLng],{icon:mkOr}).addTo(detailMap).bindPopup(s.originName||'Origen');
+    detailMarkers.dest   = L.marker([s.destLat,s.destLng],{icon:mkDt}).addTo(detailMap).bindPopup(s.destName||'Destino');
+
+    L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],
+      {color:'#C0C5D0',weight:3,dashArray:'2 8'}).addTo(detailMap);
+
     if (s.courierLat && s.courierLng) {
-      detailMarkers.courier = L.marker([s.courierLat,s.courierLng],{icon:mkCr}).addTo(detailMap).bindPopup('Repartidor');
+      detailMarkers.courier = L.marker([s.courierLat,s.courierLng],{icon:mkCr}).addTo(detailMap).bindPopup('Transportista');
+      L.polyline([[s.originLat,s.originLng],[s.courierLat,s.courierLng]],
+        {color:s.alert?'#D14343':'#1F9D6F',weight:4}).addTo(detailMap);
     }
 
-    // Draw real road route if we have origin + dest
-    if (s.originLat && s.destLat) {
-      try {
-        const routeRes = await fetch(
-          `/api/route?oLat=${s.originLat}&oLng=${s.originLng}&dLat=${s.destLat}&dLng=${s.destLng}`,
-          { cache: 'no-store' }
-        );
-        const routeData = await routeRes.json();
-        if (routeData.geometry && routeData.geometry.coordinates) {
-          // GeoJSON coords are [lng, lat] — Leaflet needs [lat, lng]
-          const latlngs = routeData.geometry.coordinates.map(c => [c[1], c[0]]);
-          L.polyline(latlngs, {color:'#1F9D6F', weight:4, opacity:0.85}).addTo(detailMap);
-        } else {
-          // Fallback: straight line
-          L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'4 8'}).addTo(detailMap);
-        }
-      } catch(e) {
-        // Fallback: straight line
-        L.polyline([[s.originLat,s.originLng],[s.destLat,s.destLng]],{color:'#C0C5D0',weight:3,dashArray:'4 8'}).addTo(detailMap);
-      }
-    }
-
-    // If courier active, draw courier → dest route
-    if (s.courierLat && s.courierLng && s.destLat) {
-      try {
-        const courierRes = await fetch(
-          `/api/route?oLat=${s.courierLat}&oLng=${s.courierLng}&dLat=${s.destLat}&dLng=${s.destLng}`,
-          { cache: 'no-store' }
-        );
-        const courierData = await courierRes.json();
-        if (courierData.geometry && courierData.geometry.coordinates) {
-          const latlngs = courierData.geometry.coordinates.map(c => [c[1], c[0]]);
-          L.polyline(latlngs, {color:'#FF5A36', weight:4, opacity:0.9}).addTo(detailMap);
-        }
-      } catch(e) {}
-    }
-
-    const pts=[];
-    if(s.originLat) pts.push([s.originLat,s.originLng]);
-    if(s.courierLat) pts.push([s.courierLat,s.courierLng]);
-    if(s.destLat) pts.push([s.destLat,s.destLng]);
-    if(pts.length>=2) detailMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});
-    else if(pts.length===1) detailMap.setView(pts[0],14);
+    detailMap.fitBounds(L.latLngBounds([[s.originLat,s.originLng],[s.destLat,s.destLng]]),{padding:[30,30]});
     setTimeout(()=>{if(detailMap)detailMap.invalidateSize();},250);
   } catch(e) { console.error('Map error:',e); }
 }
@@ -1185,10 +1033,10 @@ async function advanceStep(id) {
     const updated = await api.patch(`/api/shipments/${id}/advance`);
     const i = shipments.findIndex(x=>x.id===id);
     if(i>=0) shipments[i] = updated;
-    addNotif(updated, `Pedido actualizado: ${STEPS[updated.currentStep]}`);
+    addNotif(updated, `Estado: ${STEPS[updated.currentStep]}`);
     renderList(document.getElementById('searchInput').value);
     renderDetail(updated);
-    toast(`${STEPS[updated.currentStep]} ✓`);
+    toast(`Avanzado a «${STEPS[updated.currentStep]}» ✓`);
   } catch(e) { toast('Error al actualizar'); }
 }
 
@@ -1265,116 +1113,151 @@ function openModal() {
   document.getElementById('modalSheet').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('f-prod').focus(),350);
-  setTimeout(initDestMap, 500);
 }
 function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
   document.getElementById('modalSheet').classList.remove('open');
   document.body.style.overflow='';
-  ['f-code','f-rec','f-phone','f-courier-phone','f-dname','f-dlat','f-dlng']
+  ['f-prod','f-car','f-code','f-rec','f-phone','f-oname','f-olat','f-olng','f-dname','f-dlat','f-dlng']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  // Reset distance hint
-  const dh=document.getElementById('dist-hint');
-  if(dh){dh.innerHTML='';dh.style.maxHeight='0';dh.style.padding='0';}
-  const gsd=document.getElementById('geo-status-dest');
-  if(gsd){gsd.textContent='';gsd.style.color='';}
-  // Restore defaults for local fields
-  const dp = document.getElementById('f-prod'); if(dp) dp.value='KING RESTO-BAR';
-  const dbr = document.getElementById('f-branch'); if(dbr) dbr.value='esquel';
-  const dn = document.getElementById('f-oname'); if(dn) dn.value='KING RESTO-BAR — Esquel 1399, Ezpeleta';
-  const dlat = document.getElementById('f-olat'); if(dlat) dlat.value='-34.762500';
-  const dlng = document.getElementById('f-olng'); if(dlng) dlng.value='-58.216000';
 }
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
 ['addTopBtn','addListBtn','addDeskBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',openModal));
 
-// ─── Geocodificación automática de direcciones ────────────────────────────
-let geoTimerOrigin = null;
-let destMiniMap = null;
-let destMarker  = null;
+// ─── Geocodificación del destino ─────────────────────────────────────────
+let geoDestTimer = null;
 
-// Default center: Ezpeleta, Quilmes (Plaza 9 de Julio area)
-const EZPELETA_CENTER = [-34.7450, -58.2210]; // Centro zona de entrega Ezpeleta
+document.getElementById('f-dname').addEventListener('input', function(e) {
+  clearTimeout(geoDestTimer);
+  const val = e.target.value.trim();
+  const st = document.getElementById('geo-status-dest');
+  if (st) { st.textContent = ''; }
+  if (val.length < 4) return;
+  geoDestTimer = setTimeout(function() {
+    geocodeDest(val);
+  }, 900);
+});
 
-function initDestMap() {
-  const el = document.getElementById('dest-mini-map');
-  if (!el || destMiniMap) return;
-  if (typeof L === 'undefined') {
-    loadLeaflet(function() { initDestMap(); });
-    return;
+async function geocodeDest(address) {
+  const st = document.getElementById('geo-status-dest');
+  const distEl = document.getElementById('dist-hint');
+  if (st) { st.textContent = '🔍 Buscando...'; st.style.color = 'var(--muted)'; }
+
+  const oLat = document.getElementById('f-olat').value || '-34.7625';
+  const oLng = document.getElementById('f-olng').value || '-58.2160';
+
+  try {
+    const r = await fetch(
+      '/api/geocode?q=' + encodeURIComponent(address) +
+      '&oLat=' + oLat + '&oLng=' + oLng,
+      { cache: 'no-store' }
+    );
+    if (!r.ok) throw new Error('No encontrada');
+    const d = await r.json();
+
+    document.getElementById('f-dlat').value = d.lat.toFixed ? d.lat.toFixed(6) : d.lat;
+    document.getElementById('f-dlng').value = d.lng.toFixed ? d.lng.toFixed(6) : d.lng;
+
+    if (st) { st.textContent = '✅ ' + (d.label || address); st.style.color = 'var(--success)'; }
+
+    // Distance via server proxy (real roads)
+    if (distEl) { distEl.style.display = 'block'; distEl.textContent = '📏 Calculando distancia...'; }
+    try {
+      const rr = await fetch(
+        '/api/route?oLat=' + oLat + '&oLng=' + oLng +
+        '&dLat=' + d.lat + '&dLng=' + d.lng,
+        { cache: 'no-store' }
+      );
+      const rd = await rr.json();
+      if (rd.km) {
+        const mins = Math.round(rd.secs / 60);
+        if (distEl) distEl.textContent = '🛵 ' + rd.km + ' km por calles · ~' + mins + ' min estimado';
+      }
+    } catch(e) {
+      if (distEl) distEl.style.display = 'none';
+    }
+  } catch(e) {
+    if (st) { st.textContent = '⚠️ No encontrada — intentá con "Salta 1534, Ezpeleta"'; st.style.color = 'var(--amber)'; }
+    if (distEl) distEl.style.display = 'none';
   }
-
-  // Init map centered on Ezpeleta
-  const oLat = parseFloat(document.getElementById('f-olat').value) || EZPELETA_CENTER[0];
-  const oLng = parseFloat(document.getElementById('f-olng').value) || EZPELETA_CENTER[1];
-
-  destMiniMap = L.map(el, { zoomControl: true });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    { maxZoom:19, attribution:'© CARTO © OSM' }).addTo(destMiniMap);
-
-  // Show origin marker faintly
-  if (oLat && oLng) {
-    L.circleMarker([oLat, oLng], {
-      radius:7, color:'#9AA3B2', weight:2, fillColor:'#9AA3B2', fillOpacity:0.7
-    }).addTo(destMiniMap).bindPopup('Origen: ' + (document.getElementById('f-oname').value||'Local'));
-    // Center between origin and expected delivery zone
-  // Center between origin and typical delivery zone
-  const centerLat = oLat ? (oLat - 0.008) : EZPELETA_CENTER[0];
-  const centerLng = oLng ? (oLng - 0.001) : EZPELETA_CENTER[1];
-  destMiniMap.setView([centerLat, centerLng], 14);
-  } else {
-    destMiniMap.setView(EZPELETA_CENTER, 14);
-  }
-
-  // Tap to set destination
-  destMiniMap.on('click', function(e) {
-    setDestMarker(e.latlng.lat, e.latlng.lng);
-    updateDistanceHint();
-  });
-
-  setTimeout(function(){ if(destMiniMap) destMiniMap.invalidateSize(); }, 300);
 }
 
-function setDestMarker(lat, lng) {
-  document.getElementById('f-dlat').value = lat.toFixed(6);
-  document.getElementById('f-dlng').value = lng.toFixed(6);
+// Distance hint element (add after geo-status-dest if not exists)
 
-  const mk = L.divIcon({
-    className:'',
-    html:'<div style="width:18px;height:18px;border-radius:50%;background:#FF5A36;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);"></div>',
-    iconSize:[18,18], iconAnchor:[9,9]
+
+// Branch selector
+const BRANCHES = {
+  esquel:  { name:'KING RESTO-BAR — Esquel 1399, Ezpeleta', lat:'-34.7625', lng:'-58.2160' },
+  quilmes: { name:'KING RESTO-BAR — Triunvirato 661, Quilmes', lat:'-34.7553', lng:'-58.2941' }
+};
+const branchSel = document.getElementById('f-branch');
+if (branchSel) {
+  branchSel.addEventListener('change', function() {
+    const b = BRANCHES[this.value];
+    if (!b) return;
+    document.getElementById('f-oname').value = b.name;
+    document.getElementById('f-olat').value  = b.lat;
+    document.getElementById('f-olng').value  = b.lng;
   });
-  if (destMarker) {
-    destMarker.setLatLng([lat, lng]);
-  } else {
-    destMarker = L.marker([lat, lng], { icon:mk, draggable:true }).addTo(destMiniMap);
-    destMarker.on('dragend', function() {
-      const p = destMarker.getLatLng();
-      document.getElementById('f-dlat').value = p.lat.toFixed(6);
-      document.getElementById('f-dlng').value = p.lng.toFixed(6);
-      updateDistanceHint();
-    });
-  }
-  destMiniMap.panTo([lat, lng]);
-
-  // Update label
-  const lbl = document.getElementById('dest-map-label');
-  if (lbl) lbl.textContent = '✅ Destino marcado — arrastrá el pin para ajustar';
 }
 
+document.getElementById('geoBtn').onclick = () => {
+  if (!('geolocation' in navigator)) { toast('Tu dispositivo no soporta GPS'); return; }
+  const btn = document.getElementById('geoBtn');
+  btn.textContent = 'Obteniendo ubicación…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('f-olat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('f-olng').value = pos.coords.longitude.toFixed(6);
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Ubicación actual cargada ✓`;
+    toast('Origen cargado desde tu ubicación actual');
+  }, ()=>{
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-6-8-11a8 8 0 1 1 16 0c0 5-8 11-8 11z"/><circle cx="12" cy="11" r="3"/></svg> Usar mi ubicación actual como origen`;
+    toast('No se pudo obtener la ubicación. Revisá los permisos.');
+  });
+};
 
+document.getElementById('submitBtn').onclick = async () => {
+  const prod = document.getElementById('f-prod').value.trim();
+  if (!prod) { toast('El nombre del producto es obligatorio'); return; }
+  const body = {
+    product: prod,
+    carrier: document.getElementById('f-car').value,
+    tracking: document.getElementById('f-code').value,
+    recipient: document.getElementById('f-rec').value,
+    phone: document.getElementById('f-phone').value,
+    originName: document.getElementById('f-oname').value,
+    originLat: document.getElementById('f-olat').value,
+    originLng: document.getElementById('f-olng').value,
+    destName: document.getElementById('f-dname').value,
+    destLat: document.getElementById('f-dlat').value,
+    destLng: document.getElementById('f-dlng').value,
+  };
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Creando…';
+  btn.disabled = true;
+  try {
+    const s = await api.post('/api/shipments', body);
+    shipments.unshift(s);
+    closeModal();
+    renderList();
+    addNotif(s, 'Nuevo envío creado');
+    openDetail(s.id);
+    showMobileView('viewList');
+    toast('¡Envío creado! 🚀');
+  } catch(e) { toast('Error al crear el envío'); }
+  finally { btn.textContent='Crear envío'; btn.disabled=false; }
+};
 
-function showDestMiniMap(lat, lng) {
-  if (!destMiniMap) initDestMap();
-  setDestMarker(lat, lng);
+// ─── URL action (?action=new) ─────────────────────────────────────────────
+if (new URLSearchParams(location.search).get('action') === 'new') {
+  window.addEventListener('load', () => setTimeout(openModal, 600));
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 applyLayout();
-renderNotifs();
 loadAll();
-
+renderNotifs();
 </script>
 </body>
 </html>
