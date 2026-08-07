@@ -1295,7 +1295,7 @@ let destMiniMap = null;
 let destMarker  = null;
 
 // Default center: Ezpeleta, Quilmes (Plaza 9 de Julio area)
-const EZPELETA_CENTER = [-34.7430, -58.2210]; // Plaza 9 de Julio, Ezpeleta
+const EZPELETA_CENTER = [-34.7450, -58.2210]; // Centro zona de entrega Ezpeleta
 
 function initDestMap() {
   const el = document.getElementById('dest-mini-map');
@@ -1319,7 +1319,10 @@ function initDestMap() {
       radius:7, color:'#9AA3B2', weight:2, fillColor:'#9AA3B2', fillOpacity:0.7
     }).addTo(destMiniMap).bindPopup('Origen: ' + (document.getElementById('f-oname').value||'Local'));
     // Center between origin and expected delivery zone
-  destMiniMap.setView([oLat - 0.010, oLng - 0.002], 13);
+  // Center between origin and typical delivery zone
+  const centerLat = oLat ? (oLat - 0.008) : EZPELETA_CENTER[0];
+  const centerLng = oLng ? (oLng - 0.001) : EZPELETA_CENTER[1];
+  destMiniMap.setView([centerLat, centerLng], 14);
   } else {
     destMiniMap.setView(EZPELETA_CENTER, 14);
   }
