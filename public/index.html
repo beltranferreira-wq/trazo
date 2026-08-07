@@ -680,6 +680,10 @@ img,svg{display:block;}
 
   <div id="geo-status-dest" style="font-size:11.5px;min-height:16px;margin:-4px 0 6px;"></div>
   <div id="dist-hint" style="display:none;background:#DCF1E6;color:#1A7C4A;border-radius:10px;padding:9px 13px;font-size:13px;font-weight:600;margin-bottom:8px;"></div>
+  <div id="route-map-wrap" style="display:none;border-radius:12px;overflow:hidden;border:1.5px solid var(--line);margin-bottom:10px;">
+    <div id="route-map" style="height:200px;width:100%;"></div>
+    <div style="background:#F8F9FA;padding:6px 10px;font-size:11px;color:var(--muted);">🗺️ Ruta por calles — verificá que el destino sea correcto</div>
+  </div>
   <div class="modal-actions">
     <button class="btn-submit" id="submitBtn">Crear envío</button>
     <button class="btn-cancel" id="cancelBtn">Cancelar</button>
@@ -1120,6 +1124,9 @@ function closeModal() {
   document.body.style.overflow='';
   ['f-prod','f-car','f-code','f-rec','f-phone','f-oname','f-olat','f-olng','f-dname','f-dlat','f-dlng']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const dh=document.getElementById('dist-hint'); if(dh)dh.style.display='none';
+  const rw=document.getElementById('route-map-wrap'); if(rw)rw.style.display='none';
+  const gs=document.getElementById('geo-status-dest'); if(gs)gs.textContent='';
 }
 document.getElementById('modalBg').onclick = closeModal;
 document.getElementById('cancelBtn').onclick = closeModal;
@@ -1138,6 +1145,66 @@ document.getElementById('f-dname').addEventListener('input', function(e) {
     geocodeDest(val);
   }, 900);
 });
+
+// ─── Leaflet dinámico ────────────────────────────────────────────────────
+let leafletLoaded = false;
+let routeMapInstance = null;
+
+function loadLeafletThen(cb) {
+  if (leafletLoaded && typeof L !== 'undefined') { cb(); return; }
+  // CSS
+  if (!document.getElementById('lf-css')) {
+    const lc = document.createElement('link');
+    lc.id = 'lf-css'; lc.rel = 'stylesheet';
+    lc.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(lc);
+  }
+  // JS
+  const ls = document.createElement('script');
+  ls.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  ls.onload = function() { leafletLoaded = true; cb(); };
+  ls.onerror = function() {
+    // fallback: local vendor
+    const ls2 = document.createElement('script');
+    ls2.src = '/vendor/leaflet/leaflet.js';
+    ls2.onload = function() { leafletLoaded = true; cb(); };
+    document.head.appendChild(ls2);
+  };
+  document.head.appendChild(ls);
+}
+
+function drawRouteMap(oLat, oLng, dLat, dLng, geojson) {
+  const wrap = document.getElementById('route-map-wrap');
+  const el   = document.getElementById('route-map');
+  if (!wrap || !el) return;
+  wrap.style.display = 'block';
+
+  loadLeafletThen(function() {
+    if (routeMapInstance) {
+      routeMapInstance.remove();
+      routeMapInstance = null;
+    }
+    const map = L.map(el, { zoomControl: true, scrollWheelZoom: false });
+    routeMapInstance = map;
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      { maxZoom: 19, attribution: '© CARTO © OSM' }).addTo(map);
+
+    const mkO = L.circleMarker([oLat, oLng], { radius:7, color:'#fff', weight:2, fillColor:'#9AA3B2', fillOpacity:1 })
+      .addTo(map).bindPopup('Origen');
+    const mkD = L.circleMarker([dLat, dLng], { radius:9, color:'#fff', weight:3, fillColor:'#15182B', fillOpacity:1 })
+      .addTo(map).bindPopup('Destino');
+
+    if (geojson && geojson.coordinates) {
+      const latlngs = geojson.coordinates.map(c => [c[1], c[0]]);
+      L.polyline(latlngs, { color:'#FF5A36', weight:4, opacity:0.9 }).addTo(map);
+      map.fitBounds(L.latLngBounds(latlngs), { padding:[24,24] });
+    } else {
+      L.polyline([[oLat,oLng],[dLat,dLng]], { color:'#C0C5D0', weight:3, dashArray:'4 8' }).addTo(map);
+      map.fitBounds([[oLat,oLng],[dLat,dLng]], { padding:[24,24] });
+    }
+    setTimeout(function(){ map.invalidateSize(); }, 200);
+  });
+}
 
 async function geocodeDest(address) {
   const st = document.getElementById('geo-status-dest');
@@ -1173,9 +1240,17 @@ async function geocodeDest(address) {
       if (rd.km) {
         const mins = Math.round(rd.secs / 60);
         if (distEl) distEl.textContent = '🛵 ' + rd.km + ' km por calles · ~' + mins + ' min estimado';
+        // Draw route on map
+        drawRouteMap(
+          parseFloat(oLat), parseFloat(oLng),
+          d.lat, d.lng,
+          rd.geometry || null
+        );
       }
     } catch(e) {
       if (distEl) distEl.style.display = 'none';
+      // Draw straight-line fallback
+      drawRouteMap(parseFloat(oLat), parseFloat(oLng), d.lat, d.lng, null);
     }
   } catch(e) {
     if (st) { st.textContent = '⚠️ No encontrada — intentá con "Salta 1534, Ezpeleta"'; st.style.color = 'var(--amber)'; }
