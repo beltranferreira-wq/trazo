@@ -337,84 +337,83 @@ app.get('/api/geocode', async (req, res) => {
   const { q, oLat, oLng } = req.query;
   if (!q) return res.status(400).json({ error: 'Falta dirección' });
 
-  // Coordenadas de referencia del local (para elegir el resultado más cercano)
   const refLat = parseFloat(oLat) || -34.7625;
   const refLng = parseFloat(oLng) || -58.2160;
 
-  try {
-    const https = require('https');
+  const https = require('https');
+  async function httpGet(url) {
+    return new Promise((resolve, reject) => {
+      const r = https.get(url, {
+        timeout: 8000,
+        headers: { 'User-Agent': 'Strike-Delivery/1.0', 'Accept-Language': 'es' }
+      }, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve(null); } });
+      });
+      r.on('error', () => resolve(null));
+      r.on('timeout', () => { r.destroy(); resolve(null); });
+    });
+  }
 
-    async function httpGet(url) {
-      return new Promise((resolve, reject) => {
-        const req2 = https.get(url, {
-          timeout: 8000,
-          headers: { 'User-Agent': 'Strike-App/1.0', 'Accept-Language': 'es' }
-        }, (r) => {
-          let body = '';
-          r.on('data', c => body += c);
-          r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+  let candidates = [];
+
+  // Intento 1: georef-ar con departamento Quilmes
+  try {
+    const d = await httpGet(
+      `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${encodeURIComponent(q)}&departamento_nombre=Quilmes&provincia_nombre=Buenos+Aires&max=10`
+    );
+    if (d && d.direcciones) {
+      d.direcciones.forEach(r => {
+        if (r.ubicacion) candidates.push({
+          lat: r.ubicacion.lat, lng: r.ubicacion.lon,
+          label: r.nomenclatura || q, source: 'georef-ar'
         });
-        req2.on('error', reject);
-        req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
       });
     }
+  } catch(e) {}
 
-    let candidates = [];
-
-    // Intento 1: georef-ar con departamento Quilmes (devuelve hasta 10 resultados)
-    try {
+  // Intento 2: Nominatim - búsqueda específica en Quilmes
+  if (candidates.length === 0) {
+    const searches = [
+      `${q}, Quilmes, Buenos Aires, Argentina`,
+      `${q}, Ezpeleta, Buenos Aires, Argentina`,
+      `${q}, Buenos Aires, Argentina`
+    ];
+    for (const query of searches) {
       const d = await httpGet(
-        `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${encodeURIComponent(q)}&departamento_nombre=Quilmes&provincia_nombre=Buenos+Aires&max=10`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=ar`
       );
-      if (d && d.direcciones) {
-        d.direcciones.forEach(r => {
-          if (r.ubicacion) candidates.push({
-            lat: r.ubicacion.lat, lng: r.ubicacion.lon,
-            label: r.nomenclatura || q, source: 'georef-ar'
-          });
-        });
-      }
-    } catch(e) { console.log('georef error:', e.message); }
-
-    // Intento 2: Nominatim con bbox de Quilmes (devuelve hasta 5 resultados)
-    if (candidates.length === 0) {
-      try {
-        const bbox = '-58.350,-34.650,-58.150,-34.850';
-        const d = await httpGet(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+', Quilmes, Buenos Aires, Argentina')}&viewbox=${bbox}&bounded=1&limit=5&countrycodes=ar`
-        );
-        if (d) d.forEach(r => candidates.push({
+      if (d && d.length > 0) {
+        d.forEach(r => candidates.push({
           lat: parseFloat(r.lat), lng: parseFloat(r.lon),
-          label: r.display_name.split(',').slice(0,3).join(','), source: 'nominatim'
+          label: r.display_name.split(',').slice(0,3).join(','),
+          source: 'nominatim'
         }));
-      } catch(e) { console.log('nominatim error:', e.message); }
+        break;
+      }
     }
-
-    if (candidates.length === 0) {
-      return res.status(404).json({ error: 'Dirección no encontrada' });
-    }
-
-    // Filtrar resultados dentro de 20km del local
-    const nearby = candidates.filter(c =>
-      haversineKmServer(refLat, refLng, c.lat, c.lng) < 20
-    );
-
-    // Elegir el más cercano al local
-    const pool = nearby.length > 0 ? nearby : candidates;
-    pool.sort((a, b) =>
-      haversineKmServer(refLat, refLng, a.lat, a.lng) -
-      haversineKmServer(refLat, refLng, b.lat, b.lng)
-    );
-
-    const best = pool[0];
-    const distKm = haversineKmServer(refLat, refLng, best.lat, best.lng).toFixed(1);
-    console.log(`Geocode "${q}": ${best.lat},${best.lng} (${distKm}km del local) [${best.source}]`);
-
-    res.json(best);
-  } catch(e) {
-    console.error('Geocode error:', e.message);
-    res.status(500).json({ error: e.message });
   }
+
+  if (candidates.length === 0) {
+    return res.status(404).json({ error: 'Dirección no encontrada. Intentá agregar "Ezpeleta" o "Quilmes" a la dirección.' });
+  }
+
+  // Filtrar por proximidad al local (dentro de 25km)
+  const nearby = candidates.filter(c =>
+    haversineKmServer(refLat, refLng, c.lat, c.lng) < 25
+  );
+
+  const pool = nearby.length > 0 ? nearby : candidates;
+  pool.sort((a, b) =>
+    haversineKmServer(refLat, refLng, a.lat, a.lng) -
+    haversineKmServer(refLat, refLng, b.lat, b.lng)
+  );
+
+  const best = pool[0];
+  const distKm = haversineKmServer(refLat, refLng, best.lat, best.lng).toFixed(1);
+  console.log(`Geocode "${q}" → ${best.lat},${best.lng} [${distKm}km del local] [${best.source}]`);
+  res.json(best);
 });
 
 
