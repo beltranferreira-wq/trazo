@@ -325,7 +325,7 @@ app.get('/api/route', async (req, res) => {
 });
 
 
-// ─── Proxy de geocodificación con filtro de proximidad ────────────────────
+// ─── Proxy de geocodificación (Google Maps) ──────────────────────────────
 function haversineKmServer(lat1, lng1, lat2, lng2) {
   const R = 6371, r = d => d * Math.PI / 180;
   const dL = r(lat2-lat1), dG = r(lng2-lng1);
@@ -339,13 +339,14 @@ app.get('/api/geocode', async (req, res) => {
 
   const refLat = parseFloat(oLat) || -34.7625;
   const refLng = parseFloat(oLng) || -58.2160;
+  const GMAPS_KEY = process.env.GOOGLE_MAPS_KEY;
 
   const https = require('https');
   async function httpGet(url) {
     return new Promise((resolve, reject) => {
       const r = https.get(url, {
         timeout: 8000,
-        headers: { 'User-Agent': 'Strike-Delivery/1.0', 'Accept-Language': 'es' }
+        headers: { 'User-Agent': 'Strike-Delivery/1.0' }
       }, (res) => {
         let body = '';
         res.on('data', c => body += c);
@@ -356,12 +357,58 @@ app.get('/api/geocode', async (req, res) => {
     });
   }
 
+  // ── Google Maps Geocoding API (más precisa para Argentina) ───────────────
+  if (GMAPS_KEY) {
+    try {
+      // Add Argentina + Buenos Aires context if not specified
+      const hasCity = /quilmes|ezpeleta|bernal|berazategui|lanús|lanus/i.test(q);
+      const query = hasCity ? q : q + ', Ezpeleta, Buenos Aires, Argentina';
+
+      const url = 'https://maps.googleapis.com/maps/api/geocode/json' +
+        '?address=' + encodeURIComponent(query) +
+        '&region=ar' +
+        '&language=es' +
+        '&key=' + GMAPS_KEY;
+
+      const d = await httpGet(url);
+
+      if (d && d.status === 'OK' && d.results && d.results.length > 0) {
+        // Filter results within 25km of the local
+        const candidates = d.results
+          .map(r => ({
+            lat: r.geometry.location.lat,
+            lng: r.geometry.location.lng,
+            label: r.formatted_address,
+            source: 'google'
+          }))
+          .filter(c => haversineKmServer(refLat, refLng, c.lat, c.lng) < 25);
+
+        if (candidates.length > 0) {
+          candidates.sort((a, b) =>
+            haversineKmServer(refLat, refLng, a.lat, a.lng) -
+            haversineKmServer(refLat, refLng, b.lat, b.lng)
+          );
+          const best = candidates[0];
+          console.log(`Google Geocode "${q}" → ${best.lat},${best.lng} [${haversineKmServer(refLat, refLng, best.lat, best.lng).toFixed(1)}km]`);
+          return res.json(best);
+        }
+      }
+
+      if (d && d.status && d.status !== 'OK') {
+        console.log('Google Geocode status:', d.status, d.error_message || '');
+      }
+    } catch(e) {
+      console.log('Google Geocode error:', e.message);
+    }
+  }
+
+  // ── Fallback: georef-ar + Nominatim ─────────────────────────────────────
   let candidates = [];
 
-  // Intento 1: georef-ar con departamento Quilmes
   try {
     const d = await httpGet(
-      `https://apis.datos.gob.ar/georef/api/direcciones?direccion=${encodeURIComponent(q)}&departamento_nombre=Quilmes&provincia_nombre=Buenos+Aires&max=10`
+      'https://apis.datos.gob.ar/georef/api/direcciones?direccion=' +
+      encodeURIComponent(q) + '&departamento_nombre=Quilmes&provincia_nombre=Buenos+Aires&max=10'
     );
     if (d && d.direcciones) {
       d.direcciones.forEach(r => {
@@ -373,47 +420,29 @@ app.get('/api/geocode', async (req, res) => {
     }
   } catch(e) {}
 
-  // Intento 2: Nominatim - búsqueda específica en Quilmes
   if (candidates.length === 0) {
-    const searches = [
-      `${q}, Quilmes, Buenos Aires, Argentina`,
-      `${q}, Ezpeleta, Buenos Aires, Argentina`,
-      `${q}, Buenos Aires, Argentina`
-    ];
+    const searches = [q + ', Ezpeleta, Quilmes, Buenos Aires, Argentina', q + ', Quilmes, Buenos Aires, Argentina'];
     for (const query of searches) {
       const d = await httpGet(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=ar`
+        'https://nominatim.openstreetmap.org/search?format=json&q=' +
+        encodeURIComponent(query) + '&limit=5&countrycodes=ar'
       );
       if (d && d.length > 0) {
         d.forEach(r => candidates.push({
           lat: parseFloat(r.lat), lng: parseFloat(r.lon),
-          label: r.display_name.split(',').slice(0,3).join(','),
-          source: 'nominatim'
+          label: r.display_name.split(',').slice(0,3).join(','), source: 'nominatim'
         }));
         break;
       }
     }
   }
 
-  if (candidates.length === 0) {
-    return res.status(404).json({ error: 'Dirección no encontrada. Intentá agregar "Ezpeleta" o "Quilmes" a la dirección.' });
-  }
+  if (candidates.length === 0) return res.status(404).json({ error: 'Dirección no encontrada' });
 
-  // Filtrar por proximidad al local (dentro de 25km)
-  const nearby = candidates.filter(c =>
-    haversineKmServer(refLat, refLng, c.lat, c.lng) < 25
-  );
-
+  const nearby = candidates.filter(c => haversineKmServer(refLat, refLng, c.lat, c.lng) < 25);
   const pool = nearby.length > 0 ? nearby : candidates;
-  pool.sort((a, b) =>
-    haversineKmServer(refLat, refLng, a.lat, a.lng) -
-    haversineKmServer(refLat, refLng, b.lat, b.lng)
-  );
-
-  const best = pool[0];
-  const distKm = haversineKmServer(refLat, refLng, best.lat, best.lng).toFixed(1);
-  console.log(`Geocode "${q}" → ${best.lat},${best.lng} [${distKm}km del local] [${best.source}]`);
-  res.json(best);
+  pool.sort((a,b) => haversineKmServer(refLat, refLng, a.lat, a.lng) - haversineKmServer(refLat, refLng, b.lat, b.lng));
+  res.json(pool[0]);
 });
 
 
